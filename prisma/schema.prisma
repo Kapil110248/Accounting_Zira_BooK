@@ -271,8 +271,9 @@ model warehouses {
   country        String?  @db.VarChar(100)
   created_at     DateTime @default(now()) @db.Timestamp(0)
 
-  products       products[]
-  transfer_items transfer_items[]
+  // ✅ New Many-to-Many Relation
+  product_warehouses product_warehouses[]
+  transfer_items     transfer_items[]
 }
 
 //-------- item_category ---------- //
@@ -288,32 +289,54 @@ model item_category {
 
 // ------------- products --------------- //
 model products {
-  id               Int      @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   company_id       Int?
-  warehouse_id     Int?
   item_category_id Int?
-  item_name        String?  @db.VarChar(255)
-  hsn              String?  @db.VarChar(100)
-  barcode          String?  @db.VarChar(100)
-  sku              String?  @db.VarChar(100)
-  description      String?  @db.Text
+  unit_detail_id   Int?
+  item_name        String?   @db.VarChar(255)
+  hsn              String?   @db.VarChar(100)
+  barcode          String?   @db.VarChar(100)
+  sku              String?   @db.VarChar(100)
+  description      String?   @db.Text
   initial_qty      Int?
+   total_stock      Int?      @default(0)
   min_order_qty    Int?
-  as_of_date       String?  @db.VarChar(255)
-  initial_cost     Decimal? @db.Decimal(15, 2)
-  sale_price       Decimal? @db.Decimal(15, 2)
-  purchase_price   Decimal? @db.Decimal(15, 2)
-  discount         Decimal? @db.Decimal(5, 2)
-  tax_account      String?  @db.VarChar(255)
-  remarks          String?  @db.Text
-  image            String?  @db.VarChar(500)
-  created_at       DateTime @default(now()) @db.Timestamp(0)
+  as_of_date       String?   @db.VarChar(255)
+  initial_cost     Decimal?  @db.Decimal(15, 2)
+  sale_price       Decimal?  @db.Decimal(15, 2)
+  purchase_price   Decimal?  @db.Decimal(15, 2)
+  discount         Decimal?  @db.Decimal(5, 2)
+  tax_account      String?   @db.VarChar(255)
+  remarks          String?   @db.Text
+  image            String?   @db.VarChar(500)
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @updatedAt
 
-  // ✅ Define cascading on child relation
-  warehouse      warehouses?      @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
-  item_category  item_category?   @relation(fields: [item_category_id], references: [id])
-  transfer_items transfer_items[]
+
+  // ✅ Existing relations
+  item_category    item_category?  @relation(fields: [item_category_id], references: [id])
+  unit_detail      unit_details?   @relation(fields: [unit_detail_id], references: [id])
+
+  // ✅ New Many-to-Many Relation
+  product_warehouses product_warehouses[]
+
+  transfer_items   transfer_items[]
   invoice_products pos_invoice_products[]
+}
+
+model product_warehouses {
+  id           Int        @id @default(autoincrement())
+  product_id   Int
+  warehouse_id Int
+  stock_qty    Int?       @default(0)
+  created_at   DateTime   @default(now())
+
+  // ✅ Relations
+  product   products   @relation(fields: [product_id], references: [id])
+  warehouse warehouses @relation(fields: [warehouse_id], references: [id])
+
+  // ✅ Ensure unique pair
+  @@unique([product_id, warehouse_id])
 }
 
 // ----------------- uoms -------------------- //
@@ -331,6 +354,8 @@ model unit_details {
   uom_id          Int?
   weight_per_unit Float? // ✅ No @db.VarChar — let Prisma choose REAL/DOUBLE
   created_at      DateTime @default(now()) @db.Timestamp(0)
+
+  products        products[]
 }
 
 // ---------- services ------------//
@@ -562,7 +587,8 @@ model pos_invoices {
 
   products pos_invoice_products[]
   customer vendorsCustomer        @relation(fields: [customer_id], references: [id])
-  tax      tax_classes?           @relation(fields: [tax_id], references: [id])
+  tax_class tax_classes? @relation(fields: [tax_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
 }
 
 model tax_classes {
@@ -717,6 +743,7 @@ model sales_return {
   return_date         DateTime            @db.Date
   return_type         String?            @default("Sales Return") @db.VarChar(50)
   warehouse_id        Int?
+  narration           String?             @db.VarChar(255)
   reason_for_return    String?            @db.Text
   sub_total           Decimal?            @default(0.00) @db.Decimal(15, 2)
   tax_total           Decimal?            @default(0.00) @db.Decimal(15, 2)
@@ -743,6 +770,7 @@ model sales_return_items {
   tax_percent     Decimal?     @default(0.00) @db.Decimal(5, 2)
   discount        Decimal?     @default(0.00) @db.Decimal(15, 2)
   amount          Decimal?     @default(0.00) @db.Decimal(15, 2)
+   narration      String?             @db.VarChar(255)
   created_at      DateTime     @default(now()) @db.Timestamp(0)
   updated_at      DateTime     @default(now()) @db.Timestamp(0)
   sales_return    sales_return @relation(fields: [sales_return_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_salesReturnItems")

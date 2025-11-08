@@ -498,103 +498,66 @@ const generateAutoVoucherNo = async () => {
   return `VR-${paddedCount}`;
 };
 
-// ✅ Create Sales Return
+
+// ✅ CREATE SALES RETURN
 export const createSalesReturn = async (req, res) => {
   try {
+    console.log("🟢 Incoming Raw Body:", req.body);
+
     const data = { ...req.body };
 
-    // Validate required fields
-    if (!data.company_id) {
-      return res.status(400).json({
-        success: false,
-        message: "company_id is required"
-      });
-    }
-
-    if (!data.return_no) {
-      return res.status(400).json({
-        success: false,
-        message: "return_no is required"
-      });
-    }
-
-    if (!data.invoice_no) {
-      return res.status(400).json({
-        success: false,
-        message: "invoice_no is required"
-      });
-    }
-
-    if (!data.return_date) {
-      return res.status(400).json({
-        success: false,
-        message: "return_date is required"
-      });
-    }
-
-    if (!data.warehouse_id) {
-      return res.status(400).json({
-        success: false,
-        message: "warehouse_id is required"
-      });
-    }
-
-    // Generate auto fields if not provided
-    const referenceId = data.reference_id || await generateReferenceId();
-    const autoVoucherNo = data.auto_voucher_no || await generateAutoVoucherNo();
-
-    // Handle items array
-    const items = data.items || data.sales_return_items || [];
-    let parsedItems = [];
-    
-    if (typeof items === 'string') {
+    // 🔹 Parse items safely
+    let items = data.items || data.sales_return_items || [];
+    if (typeof items === "string") {
       try {
-        parsedItems = JSON.parse(items);
-      } catch (e) {
-        parsedItems = [];
+        items = JSON.parse(items);
+      } catch (err) {
+        console.error("❌ Error parsing items JSON:", err.message);
+        items = [];
       }
-    } else if (Array.isArray(items)) {
-      parsedItems = items;
     }
+    console.log("🟢 Parsed Items:", items);
 
-    // Calculate totals from items if not provided
-    let subTotal = toNumber(data.sub_total || 0);
-    let taxTotal = toNumber(data.tax_total || 0);
-    let discountTotal = toNumber(data.discount_total || 0);
-    let grandTotal = toNumber(data.grand_total || 0);
+    // 🔹 Validate items contain narration
+    items.forEach((item, index) => {
+      console.log(`🧾 Item ${index + 1}:`, item.narration);
+    });
 
-    if (parsedItems.length > 0 && subTotal === 0) {
-      parsedItems.forEach(item => {
-        const qty = toNumber(item.quantity || item.qty || 0);
-        const rate = toNumber(item.rate || 0);
-        const taxPercent = toNumber(item.tax_percent || item.tax || 0);
-        const discount = toNumber(item.discount || 0);
+    // 🔹 Calculate totals (same as before)
+    let subTotal = 0,
+      taxTotal = 0,
+      discountTotal = 0,
+      grandTotal = 0;
 
-        const itemSubTotal = qty * rate;
-        const itemDiscount = (itemSubTotal * discount) / 100;
-        const itemAfterDiscount = itemSubTotal - itemDiscount;
-        const itemTax = (itemAfterDiscount * taxPercent) / 100;
-        const itemAmount = itemAfterDiscount + itemTax;
+    items.forEach((item) => {
+      const qty = parseFloat(item.quantity || 0);
+      const rate = parseFloat(item.rate || 0);
+      const taxPercent = parseFloat(item.tax_percent || 0);
+      const discount = parseFloat(item.discount || 0);
 
-        subTotal += itemSubTotal;
-        discountTotal += itemDiscount;
-        taxTotal += itemTax;
-        grandTotal += itemAmount;
-      });
-    }
+      const itemSubTotal = qty * rate;
+      const itemDiscount = (itemSubTotal * discount) / 100;
+      const itemAfterDiscount = itemSubTotal - itemDiscount;
+      const itemTax = (itemAfterDiscount * taxPercent) / 100;
+      const itemAmount = itemAfterDiscount + itemTax;
 
-    // Create sales return with nested items
+      subTotal += itemSubTotal;
+      discountTotal += itemDiscount;
+      taxTotal += itemTax;
+      grandTotal += itemAmount;
+    });
+
+    // 🔹 Prepare create data
     const createData = {
-      company_id: toNumber(data.company_id),
-      reference_id: referenceId,
-      manual_voucher_no: data.manual_voucher_no || null,
-      auto_voucher_no: autoVoucherNo,
-      customer_id: data.customer_id ? toNumber(data.customer_id) : null,
+      company_id: Number(data.company_id),
+      reference_id: data.reference_id || "REF-AUTO",
+      auto_voucher_no: data.auto_voucher_no || "AUTO-VR",
+      customer_id: data.customer_id ? Number(data.customer_id) : null,
       return_no: data.return_no,
       invoice_no: data.invoice_no,
       return_date: new Date(data.return_date),
       return_type: data.return_type || "Sales Return",
-      warehouse_id: toNumber(data.warehouse_id),
+      warehouse_id: Number(data.warehouse_id),
       reason_for_return: data.reason_for_return || null,
       sub_total: subTotal,
       tax_total: taxTotal,
@@ -604,40 +567,46 @@ export const createSalesReturn = async (req, res) => {
       notes: data.notes || null,
       created_at: new Date(),
       updated_at: new Date(),
-      sales_return_items: parsedItems.length > 0 ? {
-        create: parsedItems.map(item => ({
-          product_id: item.product_id ? toNumber(item.product_id) : null,
-          item_name: item.item_name || item.name || "",
-          quantity: toNumber(item.quantity || item.qty || 0),
-          rate: toNumber(item.rate || 0),
-          tax_percent: toNumber(item.tax_percent || item.tax || 0),
-          discount: toNumber(item.discount || 0),
-          amount: toNumber(item.amount) || (toNumber(item.quantity || item.qty || 0) * toNumber(item.rate))
-        }))
-      } : undefined
+      sales_return_items: {
+        create: items.map((item) => ({
+          product_id: item.product_id ? Number(item.product_id) : null,
+          item_name: item.item_name || "",
+          quantity: parseFloat(item.quantity || 0),
+          rate: parseFloat(item.rate || 0),
+          tax_percent: parseFloat(item.tax_percent || 0),
+          discount: parseFloat(item.discount || 0),
+          amount:
+            parseFloat(item.amount) ||
+            parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+          narration: item.narration || null, // ✅ Should now appear
+        })),
+      },
     };
 
+    console.log("🟡 Final Data to Insert:", JSON.stringify(createData, null, 2));
+
+    // 🔹 Insert to DB
     const newReturn = await prisma.sales_return.create({
       data: createData,
-      include: {
-        sales_return_items: true
-      }
+      include: { sales_return_items: true },
     });
 
     return res.status(201).json({
       success: true,
       message: "Sales return created successfully",
-      data: newReturn
+      data: newReturn,
     });
   } catch (error) {
-    console.error("Error creating sales return:", error);
+    console.error("❌ Error creating sales return:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
-      error: error.message
+      error: error.message,
     });
   }
 };
+
+
 
 // ✅ Get All Sales Returns
 // ✅ Get All Sales Returns (Fixed Version)
@@ -800,59 +769,48 @@ export const getSalesReturnById = async (req, res) => {
 };
 
 // ✅ Update Sales Return
+
 export const updateSalesReturn = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Validate ID
     if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid ID parameter"
-      });
+      return res.status(400).json({ success: false, message: "Invalid ID parameter" });
     }
 
     const data = { ...req.body };
 
     const existing = await prisma.sales_return.findUnique({
       where: { id: parseInt(id) },
-      include: { sales_return_items: true }
+      include: { sales_return_items: true },
     });
 
     if (!existing) {
-      return res.status(404).json({
-        success: false,
-        message: "Sales return not found"
-      });
+      return res.status(404).json({ success: false, message: "Sales return not found" });
     }
 
-    // Handle items update if provided
-    const items = data.items || data.sales_return_items || [];
-    let parsedItems = [];
-    
-    if (typeof items === 'string') {
+    // 🔹 Parse items array
+    let items = data.items || data.sales_return_items || [];
+    if (typeof items === "string") {
       try {
-        parsedItems = JSON.parse(items);
-      } catch (e) {
-        parsedItems = [];
+        items = JSON.parse(items);
+      } catch {
+        items = [];
       }
-    } else if (Array.isArray(items)) {
-      parsedItems = items;
     }
 
-    // Calculate totals if items provided
+    // 🔹 Calculate totals
     let subTotal = toNumber(data.sub_total || existing.sub_total || 0);
     let taxTotal = toNumber(data.tax_total || existing.tax_total || 0);
     let discountTotal = toNumber(data.discount_total || existing.discount_total || 0);
     let grandTotal = toNumber(data.grand_total || existing.grand_total || 0);
 
-    if (parsedItems.length > 0) {
+    if (items.length > 0) {
       subTotal = 0;
       taxTotal = 0;
       discountTotal = 0;
       grandTotal = 0;
 
-      parsedItems.forEach(item => {
+      items.forEach((item) => {
         const qty = toNumber(item.quantity || item.qty || 0);
         const rate = toNumber(item.rate || 0);
         const taxPercent = toNumber(item.tax_percent || item.tax || 0);
@@ -871,22 +829,32 @@ export const updateSalesReturn = async (req, res) => {
       });
     }
 
-    // Delete existing items if new items provided
-    if (parsedItems.length > 0) {
+    // 🔹 If new items provided, delete old ones
+    if (items.length > 0) {
       await prisma.sales_return_items.deleteMany({
-        where: { sales_return_id: parseInt(id) }
+        where: { sales_return_id: parseInt(id) },
       });
     }
 
+    // 🔹 Prepare update data
     const updateData = {
-      manual_voucher_no: data.manual_voucher_no !== undefined ? data.manual_voucher_no : existing.manual_voucher_no,
-      customer_id: data.customer_id !== undefined ? (data.customer_id ? toNumber(data.customer_id) : null) : existing.customer_id,
+      manual_voucher_no:
+        data.manual_voucher_no !== undefined ? data.manual_voucher_no : existing.manual_voucher_no,
+      customer_id:
+        data.customer_id !== undefined
+          ? data.customer_id
+            ? toNumber(data.customer_id)
+            : null
+          : existing.customer_id,
       return_no: data.return_no || existing.return_no,
       invoice_no: data.invoice_no || existing.invoice_no,
       return_date: data.return_date ? new Date(data.return_date) : existing.return_date,
       return_type: data.return_type || existing.return_type,
       warehouse_id: data.warehouse_id ? toNumber(data.warehouse_id) : existing.warehouse_id,
-      reason_for_return: data.reason_for_return !== undefined ? data.reason_for_return : existing.reason_for_return,
+      reason_for_return:
+        data.reason_for_return !== undefined ? data.reason_for_return : existing.reason_for_return,
+      narration:
+        data.narration !== undefined ? data.narration : existing.narration, // ✅ narration field added
       sub_total: subTotal,
       tax_total: taxTotal,
       discount_total: discountTotal,
@@ -894,41 +862,45 @@ export const updateSalesReturn = async (req, res) => {
       status: data.status || existing.status,
       notes: data.notes !== undefined ? data.notes : existing.notes,
       updated_at: new Date(),
-      sales_return_items: parsedItems.length > 0 ? {
-        create: parsedItems.map(item => ({
-          product_id: item.product_id ? toNumber(item.product_id) : null,
-          item_name: item.item_name || item.name || "",
-          quantity: toNumber(item.quantity || item.qty || 0),
-          rate: toNumber(item.rate || 0),
-          tax_percent: toNumber(item.tax_percent || item.tax || 0),
-          discount: toNumber(item.discount || 0),
-          amount: toNumber(item.amount) || (toNumber(item.quantity || item.qty || 0) * toNumber(item.rate))
-        }))
-      } : undefined
+      sales_return_items:
+        items.length > 0
+          ? {
+              create: items.map((item) => ({
+                product_id: item.product_id ? toNumber(item.product_id) : null,
+                item_name: item.item_name || item.name || "",
+                quantity: toNumber(item.quantity || item.qty || 0),
+                rate: toNumber(item.rate || 0),
+                tax_percent: toNumber(item.tax_percent || item.tax || 0),
+                discount: toNumber(item.discount || 0),
+                amount:
+                  toNumber(item.amount) ||
+                  toNumber(item.quantity || item.qty || 0) * toNumber(item.rate),
+              })),
+            }
+          : undefined,
     };
 
     const updatedReturn = await prisma.sales_return.update({
       where: { id: parseInt(id) },
       data: updateData,
-      include: {
-        sales_return_items: true
-      }
+      include: { sales_return_items: true },
     });
 
     return res.status(200).json({
       success: true,
       message: "Sales return updated successfully",
-      data: updatedReturn
+      data: updatedReturn,
     });
   } catch (error) {
     console.error("Error updating sales return:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
-      error: error.message
+      error: error.message,
     });
   }
 };
+
 
 // ✅ Delete Sales Return
 export const deleteSalesReturn = async (req, res) => {
