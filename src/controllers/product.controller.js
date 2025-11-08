@@ -85,7 +85,7 @@ export const createProduct = async (req, res) => {
       discount,
       tax_account,
       remarks,
-      warehouses, // ✅ array or JSON string [{ warehouse_id, stock_qty }]
+      warehouses, // ✅ [{ warehouse_id, stock_qty }]
     } = req.body;
 
     // ✅ Upload image if provided
@@ -109,42 +109,41 @@ export const createProduct = async (req, res) => {
 
     // ✅ Calculate total stock
     const totalStock = parsedWarehouses.reduce(
-      (sum, w) => sum + (toNumber(w.stock_qty) || 0),
+      (sum, w) => sum + (Number(w.stock_qty) || 0),
       0
     );
 
     // ✅ Create Product
     const product = await prisma.products.create({
       data: {
-        company_id: toNumber(company_id),
-        item_category_id: toNumber(item_category_id),
-        unit_detail_id: toNumber(unit_detail_id),
+        company_id: Number(company_id),
+        item_category_id: Number(item_category_id),
+        unit_detail_id: Number(unit_detail_id),
         item_name,
         hsn,
         barcode,
         sku,
         description,
-        initial_qty: toNumber(initial_qty),
-        min_order_qty: toNumber(min_order_qty),
+        initial_qty: Number(initial_qty),
+        min_order_qty: Number(min_order_qty),
         as_of_date,
-        initial_cost: toNumber(initial_cost),
-        sale_price: toNumber(sale_price),
-        purchase_price: toNumber(purchase_price),
-        discount: toNumber(discount),
+        initial_cost: Number(initial_cost),
+        sale_price: Number(sale_price),
+        purchase_price: Number(purchase_price),
+        discount: Number(discount),
         tax_account,
         remarks,
         image: imageUrl,
-        total_stock: totalStock, // ✅ Save total stock
+        total_stock: totalStock,
 
-        // ✅ Many-to-many relation for warehouses
+        // ✅ Create warehouse mappings
         product_warehouses: {
           create: parsedWarehouses.map((w) => ({
-            warehouse_id: toNumber(w.warehouse_id),
-            stock_qty: toNumber(w.stock_qty) || 0,
+            warehouse_id: Number(w.warehouse_id),
+            stock_qty: Number(w.stock_qty) || 0,
           })),
         },
       },
-
       include: {
         product_warehouses: {
           include: {
@@ -166,10 +165,22 @@ export const createProduct = async (req, res) => {
       },
     });
 
+    // ✅ Transform warehouse data before sending response
+    const simplifiedWarehouses = product.product_warehouses.map((pw) => ({
+      id: pw.warehouse.id,
+      warehouse_name: pw.warehouse.warehouse_name,
+      location: pw.warehouse.location,
+      stock_qty: pw.stock_qty,
+    }));
+
+    // ✅ Final response
     return res.status(201).json({
       success: true,
       message: "✅ Product created successfully with warehouse mapping",
-      data: product,
+      data: {
+        ...product,
+        product_warehouses: simplifiedWarehouses, // ✅ cleaned array
+      },
     });
   } catch (error) {
     console.error("❌ Create product error:", error);
@@ -554,7 +565,6 @@ export const getProductById = async (req, res) => {
  * 🟠 UPDATE PRODUCT
  */
 
-
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -576,27 +586,27 @@ export const updateProduct = async (req, res) => {
       discount,
       tax_account,
       remarks,
-      warehouses // ✅ Expected: [{ warehouse_id, stock_qty }]
+      warehouses, // ✅ Expected: [{ warehouse_id, stock_qty }]
     } = req.body;
 
     const productId = Number(id);
     if (!productId || isNaN(productId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or missing product ID"
+        message: "Invalid or missing product ID",
       });
     }
 
     // ✅ Check if product exists
     const existingProduct = await prisma.products.findUnique({
       where: { id: productId },
-      include: { product_warehouses: true }
+      include: { product_warehouses: true },
     });
 
     if (!existingProduct) {
       return res.status(404).json({
         success: false,
-        message: "Product not found"
+        message: "Product not found",
       });
     }
 
@@ -626,15 +636,15 @@ export const updateProduct = async (req, res) => {
     // ✅ Update product_warehouses mapping (replace all for simplicity)
     if (parsedWarehouses.length > 0) {
       await prisma.product_warehouses.deleteMany({
-        where: { product_id: productId }
+        where: { product_id: productId },
       });
 
       await prisma.product_warehouses.createMany({
         data: parsedWarehouses.map((w) => ({
           product_id: productId,
           warehouse_id: Number(w.warehouse_id),
-          stock_qty: Number(w.stock_qty) || 0
-        }))
+          stock_qty: Number(w.stock_qty) || 0,
+        })),
       });
     }
 
@@ -646,12 +656,16 @@ export const updateProduct = async (req, res) => {
       barcode: barcode ?? existingProduct.barcode,
       sku: sku ?? existingProduct.sku,
       description: description ?? existingProduct.description,
-      initial_qty: initial_qty ? Number(initial_qty) : existingProduct.initial_qty,
+      initial_qty: initial_qty
+        ? Number(initial_qty)
+        : existingProduct.initial_qty,
       min_order_qty: min_order_qty
         ? Number(min_order_qty)
         : existingProduct.min_order_qty,
       as_of_date: as_of_date ?? existingProduct.as_of_date,
-      initial_cost: initial_cost ? Number(initial_cost) : existingProduct.initial_cost,
+      initial_cost: initial_cost
+        ? Number(initial_cost)
+        : existingProduct.initial_cost,
       sale_price: sale_price ? Number(sale_price) : existingProduct.sale_price,
       purchase_price: purchase_price
         ? Number(purchase_price)
@@ -661,7 +675,7 @@ export const updateProduct = async (req, res) => {
       remarks: remarks ?? existingProduct.remarks,
       image: imageUrl,
       total_stock: totalStock,
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
     // ✅ Handle relational updates properly
@@ -686,10 +700,10 @@ export const updateProduct = async (req, res) => {
                 location: true,
                 city: true,
                 state: true,
-                country: true
-              }
-            }
-          }
+                country: true,
+              },
+            },
+          },
         },
         item_category: { select: { id: true, item_category_name: true } },
         unit_detail: {
@@ -698,28 +712,26 @@ export const updateProduct = async (req, res) => {
             company_id: true,
             uom_id: true,
             weight_per_unit: true,
-            created_at: true
-          }
-        }
-      }
+            created_at: true,
+          },
+        },
+      },
     });
 
     res.status(200).json({
       success: true,
       message: "✅ Product updated successfully",
-      data: updatedProduct
+      data: updatedProduct,
     });
   } catch (error) {
     console.error("❌ Update product error:", error);
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
-      error: error.message
+      error: error.message,
     });
   }
 };
-
-
 
 /**
  * 🔴 DELETE PRODUCT
@@ -727,20 +739,41 @@ export const updateProduct = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
+    const productId = Number(id);
 
+    // 1️⃣ Check if product exists
     const product = await prisma.products.findUnique({
-      where: { id: toNumber(id) },
+      where: { id: productId },
+      include: { product_warehouses: true },
     });
-    if (!product)
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
 
-    await prisma.products.delete({ where: { id: toNumber(id) } });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ Product not found",
+      });
+    }
 
-    res.json({ success: true, message: "Product deleted successfully" });
+    // 2️⃣ Delete related warehouse mappings first
+    await prisma.product_warehouses.deleteMany({
+      where: { product_id: productId },
+    });
+
+    // 3️⃣ Then delete the product
+    await prisma.products.delete({
+      where: { id: productId },
+    });
+
+    // ✅ Success response
+    return res.json({
+      success: true,
+      message: "✅ Product and related warehouse mappings deleted successfully",
+    });
   } catch (error) {
-    console.error("Delete product error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Delete product error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
   }
 };

@@ -24,6 +24,7 @@ import salesreturn from "./src/routes/salesreturn.routes.js";
 import salesorder from "./src/routes/salesorder.routes.js";
 import salesReport from "./src/routes/salesReport.routes.js";
 import purchaseReport from "./src/routes/purchaseReport.routes.js";
+import company from "./src/routes/companies.Routes.js";
 
 const router = express.Router();
 
@@ -52,5 +53,6 @@ router.use("/sales-return", salesreturn);
 router.use("/", salesorder);
 router.use("/sales-reports", salesReport);
 router.use("/purchase-reports", purchaseReport);
+router.use("/companies", company);
 
 export default router;

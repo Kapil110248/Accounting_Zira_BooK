@@ -305,7 +305,21 @@ export const createSuperAdmin = async (req, res) => {
 
 export const createCompany = async (req, res) => {
   try {
-    const { name, email, password, startDate, expireDate, plan_id, planType } = req.body;
+    const {
+      name,
+      email,
+      password,
+      startDate,
+      expireDate,
+      plan_id,
+      planType,
+      address,
+      country,
+      state,
+      city,
+      postal_code,
+      currency,
+    } = req.body;
 
     // ✅ Validate required fields
     if (!name || !email || !password || !startDate || !expireDate || !plan_id || !planType) {
@@ -321,22 +335,46 @@ export const createCompany = async (req, res) => {
     // ✅ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ Upload company logo if exists
-    let profileUrl = null;
-    if (req.file) {
-      profileUrl = await uploadToCloudinary(req.file.buffer, "companies");
+    // 🖼️ Upload multiple company images (if provided)
+    let company_icon_url = null;
+    let favicon_url = null;
+    let company_logo_url = null;
+    let company_dark_logo_url = null;
+
+    if (req.files) {
+      if (req.files.company_icon) {
+        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+      }
+      if (req.files.favicon) {
+        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+      }
+      if (req.files.company_logo) {
+        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+      }
+      if (req.files.company_dark_logo) {
+        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+      }
     }
 
-    // ✅ Create company
+    // ✅ Create company record
     const newCompany = await prisma.users.create({
       data: {
         name,
         email,
         password: hashedPassword,
         role: "COMPANY",
-        profile: profileUrl,
         startDate: new Date(startDate),
         expireDate: new Date(expireDate),
+        address,
+        country,
+        state,
+        city,
+        postal_code,
+        currency,
+        company_icon_url,
+        favicon_url,
+        company_logo_url,
+        company_dark_logo_url,
         user_plans: {
           create: {
             plan_id: parseInt(plan_id),
@@ -349,62 +387,115 @@ export const createCompany = async (req, res) => {
         name: true,
         email: true,
         role: true,
-        profile: true,
         startDate: true,
         expireDate: true,
+        address: true,
+        country: true,
+        state: true,
+        city: true,
+        postal_code: true,
+        currency: true,
+        company_icon_url: true,
+        favicon_url: true,
+        company_logo_url: true,
+        company_dark_logo_url: true,
         user_plans: true,
         created_at: true,
       },
     });
 
-    return res.status(201).json({ message: "Company created successfully", data: newCompany });
+    return res.status(201).json({
+      success: true,
+      message: "✅ Company created successfully",
+      data: newCompany,
+    });
   } catch (error) {
-    console.error("Create company error:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
+    console.error("❌ Create company error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 
 export const updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, startDate, expireDate, plan_id, planType } = req.body;
+    const {
+      name,
+      startDate,
+      expireDate,
+      plan_id,
+      planType,
+      address,
+      country,
+      state,
+      city,
+      postal_code,
+      currency,
+    } = req.body;
+
+    const companyId = parseInt(id);
 
     const existingCompany = await prisma.users.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: companyId },
+      include: { user_plans: true },
     });
 
     if (!existingCompany || existingCompany.role !== "COMPANY") {
-      return res.status(404).json({ message: "Company not found" });
-    }
-    
-    let profileUrl = existingCompany.profile;
-    
-    // ✅ If new file uploaded → replace old image
-    if (req.file) {
-      if (existingCompany.profile) {
-        const publicId = existingCompany.profile.split("/").pop().split(".")[0];
-        await deleteFromCloudinary(publicId);
-      }
-      profileUrl = await uploadToCloudinary(req.file.buffer, "companies");
+      return res.status(404).json({ success: false, message: "Company not found" });
     }
 
+    // 🖼️ Handle multiple image uploads (replace only those provided)
+    let {
+      company_icon_url,
+      favicon_url,
+      company_logo_url,
+      company_dark_logo_url,
+    } = existingCompany;
+
+    if (req.files) {
+      if (req.files.company_icon) {
+        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+      }
+      if (req.files.favicon) {
+        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+      }
+      if (req.files.company_logo) {
+        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+      }
+      if (req.files.company_dark_logo) {
+        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+      }
+    }
+
+    // 🧱 Build update object
     const updateData = {
       name: name ?? existingCompany.name,
-      profile: profileUrl,
       startDate: startDate ? new Date(startDate) : existingCompany.startDate,
       expireDate: expireDate ? new Date(expireDate) : existingCompany.expireDate,
+      address: address ?? existingCompany.address,
+      country: country ?? existingCompany.country,
+      state: state ?? existingCompany.state,
+      city: city ?? existingCompany.city,
+      postal_code: postal_code ?? existingCompany.postal_code,
+      currency: currency ?? existingCompany.currency,
+      company_icon_url,
+      favicon_url,
+      company_logo_url,
+      company_dark_logo_url,
     };
-    
-    // ✅ If plan details are provided → update last added plan
+
+    // ✅ Plan update or creation
     if (plan_id || planType) {
-      // Get last added plan for this company
       const lastPlan = await prisma.user_plans.findFirst({
-        where: { user_id: parseInt(id) },
-        orderBy: { id: "desc" }, // <-- get latest record
+        where: { user_id: companyId },
+        orderBy: { id: "desc" },
       });
 
       if (lastPlan) {
-        // Update last plan
         await prisma.user_plans.update({
           where: { id: lastPlan.id },
           data: {
@@ -413,10 +504,9 @@ export const updateCompany = async (req, res) => {
           },
         });
       } else {
-        // If no plan exists, create one
         await prisma.user_plans.create({
           data: {
-            user_id: parseInt(id),
+            user_id: companyId,
             plan_id: parseInt(plan_id),
             planType,
           },
@@ -424,22 +514,25 @@ export const updateCompany = async (req, res) => {
       }
     }
 
-    // ✅ Finally update company details
+    // ✅ Update company details
     const updatedCompany = await prisma.users.update({
-      where: { id: parseInt(id) },
+      where: { id: companyId },
       data: updateData,
       include: { user_plans: true },
     });
-    
+
     return res.status(200).json({
-      message: "Company updated successfully",
+      success: true,
+      message: "✅ Company updated successfully",
       data: updatedCompany,
     });
   } catch (error) {
-    console.error("Update company error:", error);
-    return res
-    .status(500)
-    .json({ message: "Internal server error", error: error.message });
+    console.error("❌ Update company error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
 

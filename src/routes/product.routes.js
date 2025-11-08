@@ -1,8 +1,16 @@
 // src/routes/product.routes.js
 import { Router } from "express";
 import { upload } from "../config/multer.js";
-import { createProduct, deleteProduct, getAllProducts, getProductById, getProductsByCompany, getProductsByCompanyAndWarehouse, updateProduct } from "../controllers/product.controller.js";
-// 
+import {
+  createProduct,
+  deleteProduct,
+  getAllProducts,
+  getProductById,
+  getProductsByCompany,
+  getProductsByCompanyAndWarehouse,
+  updateProduct,
+} from "../controllers/product.controller.js";
+//
 
 const router = Router();
 
@@ -15,7 +23,10 @@ router.get("/", getAllProducts);
 router.get("/company/:company_id", getProductsByCompany);
 
 // 🟢 Get by company_id + warehouse_id
-router.get("/company/:company_id/warehouse/:warehouse_id", getProductsByCompanyAndWarehouse);
+router.get(
+  "/company/:company_id/warehouse/:warehouse_id",
+  getProductsByCompanyAndWarehouse
+);
 
 // 🟢 Get by ID
 router.get("/:id", getProductById);

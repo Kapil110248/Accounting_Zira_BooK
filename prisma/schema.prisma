@@ -100,6 +100,21 @@ model users {
   vendorsCustomer vendorsCustomer[]
   transactions    transactions[]
   adjustments     adjustments[]
+
+  // 🏠 Address Information (new fields)
+
+  address      String?   @db.VarChar(500)
+  country      String?   @db.VarChar(100)
+  state        String?   @db.VarChar(100)
+  city         String?   @db.VarChar(100)
+  postal_code  String?   @db.VarChar(20)
+  currency     String?   @db.VarChar(50)
+
+    // 🖼️ New Image Fields
+  company_icon_url      String? @db.VarChar(500)
+  favicon_url           String? @db.VarChar(500)
+  company_logo_url      String? @db.VarChar(500)
+  company_dark_logo_url String? @db.VarChar(500)
 }
 
 enum Role {
@@ -441,7 +456,7 @@ model transfer_items {
   narration           String?    @db.VarChar(255)
   created_at          DateTime   @default(now()) @db.Timestamp(0)
   transfers           transfers  @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
-  products            products   @relation(fields: [product_id], references: [id])
+  products            products   @relation(fields: [product_id], references: [id] ,  onDelete: Cascade , onUpdate: Cascade)
   warehouses          warehouses @relation(fields: [source_warehouse_id], references: [id], onDelete: Cascade)
 
   @@index([product_id])
@@ -625,8 +640,9 @@ model pos_invoice_products {
   quantity   Int
   price      Decimal @db.Decimal(10, 2)
 
-  invoice pos_invoices @relation(fields: [invoice_id], references: [id])
-  product     products @relation(fields: [product_id], references: [id])
+  
+  invoice pos_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 

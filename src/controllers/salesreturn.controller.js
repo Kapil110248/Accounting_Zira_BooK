@@ -773,12 +773,14 @@ export const getSalesReturnById = async (req, res) => {
 export const updateSalesReturn = async (req, res) => {
   try {
     const { id } = req.params;
+
     if (!id || isNaN(parseInt(id))) {
       return res.status(400).json({ success: false, message: "Invalid ID parameter" });
     }
 
     const data = { ...req.body };
 
+    // 🟢 Fetch existing record
     const existing = await prisma.sales_return.findUnique({
       where: { id: parseInt(id) },
       include: { sales_return_items: true },
@@ -788,7 +790,7 @@ export const updateSalesReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: "Sales return not found" });
     }
 
-    // 🔹 Parse items array
+    // 🧩 Parse items (in case they are sent as string)
     let items = data.items || data.sales_return_items || [];
     if (typeof items === "string") {
       try {
@@ -798,23 +800,17 @@ export const updateSalesReturn = async (req, res) => {
       }
     }
 
-    // 🔹 Calculate totals
-    let subTotal = toNumber(data.sub_total || existing.sub_total || 0);
-    let taxTotal = toNumber(data.tax_total || existing.tax_total || 0);
-    let discountTotal = toNumber(data.discount_total || existing.discount_total || 0);
-    let grandTotal = toNumber(data.grand_total || existing.grand_total || 0);
+    console.log("🧾 Incoming Items Narration:", items.map(i => i.narration));
+
+    // 🔹 Recalculate totals
+    let subTotal = 0, taxTotal = 0, discountTotal = 0, grandTotal = 0;
 
     if (items.length > 0) {
-      subTotal = 0;
-      taxTotal = 0;
-      discountTotal = 0;
-      grandTotal = 0;
-
       items.forEach((item) => {
-        const qty = toNumber(item.quantity || item.qty || 0);
-        const rate = toNumber(item.rate || 0);
-        const taxPercent = toNumber(item.tax_percent || item.tax || 0);
-        const discount = toNumber(item.discount || 0);
+        const qty = parseFloat(item.quantity || 0);
+        const rate = parseFloat(item.rate || 0);
+        const taxPercent = parseFloat(item.tax_percent || 0);
+        const discount = parseFloat(item.discount || 0);
 
         const itemSubTotal = qty * rate;
         const itemDiscount = (itemSubTotal * discount) / 100;
@@ -827,59 +823,59 @@ export const updateSalesReturn = async (req, res) => {
         taxTotal += itemTax;
         grandTotal += itemAmount;
       });
+    } else {
+      subTotal = Number(data.sub_total || existing.sub_total || 0);
+      taxTotal = Number(data.tax_total || existing.tax_total || 0);
+      discountTotal = Number(data.discount_total || existing.discount_total || 0);
+      grandTotal = Number(data.grand_total || existing.grand_total || 0);
     }
 
-    // 🔹 If new items provided, delete old ones
+    // 🔹 Delete old items if new ones are sent
     if (items.length > 0) {
       await prisma.sales_return_items.deleteMany({
         where: { sales_return_id: parseInt(id) },
       });
     }
 
-    // 🔹 Prepare update data
+    // 🔹 Prepare update data — ❌ remove main narration
     const updateData = {
-      manual_voucher_no:
-        data.manual_voucher_no !== undefined ? data.manual_voucher_no : existing.manual_voucher_no,
-      customer_id:
-        data.customer_id !== undefined
-          ? data.customer_id
-            ? toNumber(data.customer_id)
-            : null
-          : existing.customer_id,
+      manual_voucher_no: data.manual_voucher_no ?? existing.manual_voucher_no,
+      customer_id: data.customer_id ? Number(data.customer_id) : existing.customer_id,
       return_no: data.return_no || existing.return_no,
       invoice_no: data.invoice_no || existing.invoice_no,
       return_date: data.return_date ? new Date(data.return_date) : existing.return_date,
       return_type: data.return_type || existing.return_type,
-      warehouse_id: data.warehouse_id ? toNumber(data.warehouse_id) : existing.warehouse_id,
-      reason_for_return:
-        data.reason_for_return !== undefined ? data.reason_for_return : existing.reason_for_return,
-      narration:
-        data.narration !== undefined ? data.narration : existing.narration, // ✅ narration field added
+      warehouse_id: data.warehouse_id ? Number(data.warehouse_id) : existing.warehouse_id,
+      reason_for_return: data.reason_for_return ?? existing.reason_for_return,
       sub_total: subTotal,
       tax_total: taxTotal,
       discount_total: discountTotal,
       grand_total: grandTotal,
       status: data.status || existing.status,
-      notes: data.notes !== undefined ? data.notes : existing.notes,
+      notes: data.notes ?? existing.notes,
       updated_at: new Date(),
+
+      // 🧾 Insert new items with narration included
       sales_return_items:
         items.length > 0
           ? {
               create: items.map((item) => ({
-                product_id: item.product_id ? toNumber(item.product_id) : null,
-                item_name: item.item_name || item.name || "",
-                quantity: toNumber(item.quantity || item.qty || 0),
-                rate: toNumber(item.rate || 0),
-                tax_percent: toNumber(item.tax_percent || item.tax || 0),
-                discount: toNumber(item.discount || 0),
+                product_id: item.product_id ? Number(item.product_id) : null,
+                item_name: item.item_name || "",
+                quantity: parseFloat(item.quantity || 0),
+                rate: parseFloat(item.rate || 0),
+                tax_percent: parseFloat(item.tax_percent || 0),
+                discount: parseFloat(item.discount || 0),
                 amount:
-                  toNumber(item.amount) ||
-                  toNumber(item.quantity || item.qty || 0) * toNumber(item.rate),
+                  parseFloat(item.amount) ||
+                  parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+                narration: item.narration ? String(item.narration) : null, // ✅ keep here only
               })),
             }
           : undefined,
     };
 
+    // 🔹 Update in DB
     const updatedReturn = await prisma.sales_return.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -888,11 +884,11 @@ export const updateSalesReturn = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Sales return updated successfully",
+      message: "✅ Sales return updated successfully",
       data: updatedReturn,
     });
   } catch (error) {
-    console.error("Error updating sales return:", error);
+    console.error("❌ Error updating sales return:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -900,6 +896,8 @@ export const updateSalesReturn = async (req, res) => {
     });
   }
 };
+
+
 
 
 // ✅ Delete Sales Return
