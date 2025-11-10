@@ -5,7 +5,7 @@ import {
   getAllTransfers,
   getTransferById,
   getTransfersByCompany,
-  updateTransfer,
+ 
 } from "../controllers/stockTransfer.controller.js";
 
 const router = Router();
@@ -23,7 +23,7 @@ router.get("/:id", getTransferById);
 router.get("/company/:company_id", getTransfersByCompany);
 
 
-router.put("/:id", updateTransfer);
+// router.put("/:id", updateTransfer);
 
 // 🗑️ Delete transfer
 router.delete("/:id", deleteTransfer);

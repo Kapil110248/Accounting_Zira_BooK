@@ -10,7 +10,7 @@ import {
 const router = Router();
 
 // Create Purchase Return (POST)
-router.post("/create-purchase-return", createPurchaseReturn);
+router.post("/ ", createPurchaseReturn);
 
 // Get All Purchase Returns (GET) with filters
 router.get("/get-returns", getAllPurchaseReturns);
