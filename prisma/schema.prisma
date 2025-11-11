@@ -74,6 +74,8 @@ model role_permissions {
   role userRoles @relation(fields: [role_id], references: [id], onDelete: Cascade)
 }
 
+
+
 // ----user models---- //
 model users {
   id         Int       @id @default(autoincrement())
@@ -121,6 +123,8 @@ enum Role {
   SUPERADMIN
   COMPANY
   USER
+
+  
 }
 
 model roles {

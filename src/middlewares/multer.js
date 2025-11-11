@@ -5,13 +5,10 @@ import cloudinary from "../config/cloudinary.js";
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "customers", // Folder name in Cloudinary
+    folder: "companies", // Folder name in Cloudinary
     allowed_formats: ["jpg", "jpeg", "png", "pdf"],
   },
 });
 
 const upload = multer({ storage });
 export default upload;
-
-
-

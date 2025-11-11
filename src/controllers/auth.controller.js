@@ -180,8 +180,10 @@
 import prisma from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.js";
-
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../config/cloudinary.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 const JWT_EXPIRES_IN = "1d"; // token validity
@@ -194,7 +196,9 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     // Find user
@@ -235,10 +239,11 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
-
 
 // ----------Super Admin Controllers ----------
 
@@ -300,7 +305,6 @@ export const createSuperAdmin = async (req, res) => {
   }
 };
 
-
 // ---------- Company Controllers All Controllers----------
 
 export const createCompany = async (req, res) => {
@@ -322,14 +326,26 @@ export const createCompany = async (req, res) => {
     } = req.body;
 
     // ✅ Validate required fields
-    if (!name || !email || !password || !startDate || !expireDate || !plan_id || !planType) {
-      return res.status(400).json({ message: "All required fields must be provided" });
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !startDate ||
+      !expireDate ||
+      !plan_id ||
+      !planType
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be provided" });
     }
 
     // ✅ Check if company email exists
     const existingUser = await prisma.users.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ message: "Company with this email already exists" });
+      return res
+        .status(409)
+        .json({ message: "Company with this email already exists" });
     }
 
     // ✅ Hash password
@@ -343,16 +359,28 @@ export const createCompany = async (req, res) => {
 
     if (req.files) {
       if (req.files.company_icon) {
-        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+        company_icon_url = await uploadToCloudinary(
+          req.files.company_icon[0].buffer,
+          "company_icons"
+        );
       }
       if (req.files.favicon) {
-        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+        favicon_url = await uploadToCloudinary(
+          req.files.favicon[0].buffer,
+          "company_favicons"
+        );
       }
       if (req.files.company_logo) {
-        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+        company_logo_url = await uploadToCloudinary(
+          req.files.company_logo[0].buffer,
+          "company_logos"
+        );
       }
       if (req.files.company_dark_logo) {
-        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+        company_dark_logo_url = await uploadToCloudinary(
+          req.files.company_dark_logo[0].buffer,
+          "company_dark_logos"
+        );
       }
     }
 
@@ -419,12 +447,149 @@ export const createCompany = async (req, res) => {
   }
 };
 
+// export const updateCompany = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const {
+//       name,
+//       startDate,
+//       expireDate,
+//       plan_id,
+//       planType,
+//       address,
+//       country,
+//       state,
+//       city,
+//       postal_code,
+//       currency,
+//     } = req.body;
+
+//     const companyId = parseInt(id);
+
+//     const existingCompany = await prisma.users.findUnique({
+//       where: { id: companyId },
+//       include: { user_plans: true },
+//     });
+
+//     if (!existingCompany || existingCompany.role !== "COMPANY") {
+//       return res.status(404).json({ success: false, message: "Company not found" });
+//     }
+
+//     // 🖼️ Handle multiple image uploads (replace only those provided)
+//     let {
+//       company_icon_url,
+//       favicon_url,
+//       company_logo_url,
+//       company_dark_logo_url,
+//     } = existingCompany;
+
+//     if (req.files) {
+//       if (req.files.company_icon) {
+//         company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+//       }
+//       if (req.files.favicon) {
+//         favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+//       }
+//       if (req.files.company_logo) {
+//         company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+//       }
+//       if (req.files.company_dark_logo) {
+//         company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+//       }
+//     }
+
+//     // 🧱 Build update object
+//     const updateData = {
+//       name: name ?? existingCompany.name,
+//       startDate: startDate ? new Date(startDate) : existingCompany.startDate,
+//       expireDate: expireDate ? new Date(expireDate) : existingCompany.expireDate,
+//       address: address ?? existingCompany.address,
+//       country: country ?? existingCompany.country,
+//       state: state ?? existingCompany.state,
+//       city: city ?? existingCompany.city,
+//       postal_code: postal_code ?? existingCompany.postal_code,
+//       currency: currency ?? existingCompany.currency,
+//       company_icon_url,
+//       favicon_url,
+//       company_logo_url,
+//       company_dark_logo_url,
+//     };
+
+//     // ✅ Plan update or creation
+//     if (plan_id || planType) {
+//       const lastPlan = await prisma.user_plans.findFirst({
+//         where: { user_id: companyId },
+//         orderBy: { id: "desc" },
+//       });
+
+//       if (lastPlan) {
+//         await prisma.user_plans.update({
+//           where: { id: lastPlan.id },
+//           data: {
+//             plan_id: plan_id ? parseInt(plan_id) : lastPlan.plan_id,
+//             planType: planType ?? lastPlan.planType,
+//           },
+//         });
+//       } else {
+//         await prisma.user_plans.create({
+//           data: {
+//             user_id: companyId,
+//             plan_id: parseInt(plan_id),
+//             planType,
+//           },
+//         });
+//       }
+//     }
+
+//     // ✅ Update company details
+//     const updatedCompany = await prisma.users.update({
+//       where: { id: companyId },
+//       data: updateData,
+//       include: { user_plans: true },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "✅ Company updated successfully",
+//       data: updatedCompany,
+//     });
+//   } catch (error) {
+//     console.error("❌ Update company error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// export const getCompanyById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const company = await prisma.users.findUnique({
+//       where: { id: parseInt(id) },
+//       include: { user_plans: true },
+//     });
+
+//     if (!company || company.role !== "COMPANY") {
+//       return res.status(404).json({ message: "Company not found" });
+//     }
+
+//     return res.status(200).json({ message: "Company fetched successfully", data: company });
+//   } catch (error) {
+//     console.error("Get company by ID error:", error);
+//     return res.status(500).json({ message: "Internal server error", error: error.message });
+//   }
+// };
 
 export const updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
     const {
       name,
+      email,
+      phone,
       startDate,
       expireDate,
       plan_id,
@@ -439,16 +604,20 @@ export const updateCompany = async (req, res) => {
 
     const companyId = parseInt(id);
 
+    // ✅ 1. Find existing company
     const existingCompany = await prisma.users.findUnique({
       where: { id: companyId },
       include: { user_plans: true },
     });
 
     if (!existingCompany || existingCompany.role !== "COMPANY") {
-      return res.status(404).json({ success: false, message: "Company not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
 
-    // 🖼️ Handle multiple image uploads (replace only those provided)
+    // ✅ 2. Keep old URLs unless new ones are uploaded
     let {
       company_icon_url,
       favicon_url,
@@ -456,26 +625,36 @@ export const updateCompany = async (req, res) => {
       company_dark_logo_url,
     } = existingCompany;
 
+    // ✅ 3. Handle uploaded files from multer-storage-cloudinary
     if (req.files) {
-      if (req.files.company_icon) {
-        company_icon_url = await uploadToCloudinary(req.files.company_icon[0].buffer, "company_icons");
+      console.log("🟢 Incoming files:", Object.keys(req.files));
+
+      if (req.files.companyIcon) {
+        company_icon_url = req.files.companyIcon[0].path; // Cloudinary URL
       }
+
       if (req.files.favicon) {
-        favicon_url = await uploadToCloudinary(req.files.favicon[0].buffer, "company_favicons");
+        favicon_url = req.files.favicon[0].path;
       }
-      if (req.files.company_logo) {
-        company_logo_url = await uploadToCloudinary(req.files.company_logo[0].buffer, "company_logos");
+
+      if (req.files.companyLogo) {
+        company_logo_url = req.files.companyLogo[0].path;
       }
-      if (req.files.company_dark_logo) {
-        company_dark_logo_url = await uploadToCloudinary(req.files.company_dark_logo[0].buffer, "company_dark_logos");
+
+      if (req.files.companyDarkLogo) {
+        company_dark_logo_url = req.files.companyDarkLogo[0].path;
       }
     }
 
-    // 🧱 Build update object
+    // ✅ 4. Prepare update data
     const updateData = {
       name: name ?? existingCompany.name,
+      email: email ?? existingCompany.email,
+      phone: phone ?? existingCompany.phone,
       startDate: startDate ? new Date(startDate) : existingCompany.startDate,
-      expireDate: expireDate ? new Date(expireDate) : existingCompany.expireDate,
+      expireDate: expireDate
+        ? new Date(expireDate)
+        : existingCompany.expireDate,
       address: address ?? existingCompany.address,
       country: country ?? existingCompany.country,
       state: state ?? existingCompany.state,
@@ -488,7 +667,7 @@ export const updateCompany = async (req, res) => {
       company_dark_logo_url,
     };
 
-    // ✅ Plan update or creation
+    // ✅ 5. Update or create plan
     if (plan_id || planType) {
       const lastPlan = await prisma.user_plans.findFirst({
         where: { user_id: companyId },
@@ -514,13 +693,14 @@ export const updateCompany = async (req, res) => {
       }
     }
 
-    // ✅ Update company details
+    // ✅ 6. Update company record in DB
     const updatedCompany = await prisma.users.update({
       where: { id: companyId },
       data: updateData,
       include: { user_plans: true },
     });
 
+    // ✅ 7. Respond with success
     return res.status(200).json({
       success: true,
       message: "✅ Company updated successfully",
@@ -535,61 +715,208 @@ export const updateCompany = async (req, res) => {
     });
   }
 };
-
 export const getCompanyById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const company = await prisma.users.findUnique({
-      where: { id: parseInt(id) },
-      include: { user_plans: true },
-    });
-    
-    if (!company || company.role !== "COMPANY") {
-      return res.status(404).json({ message: "Company not found" });
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Company ID is required",
+      });
     }
-    
-    return res.status(200).json({ message: "Company fetched successfully", data: company });
-  } catch (error) {
-    console.error("Get company by ID error:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
-  }
-};
 
-export const getAllCompanies = async (req, res) => {
-  try {
-    const companies = await prisma.users.findMany({
-      where: { role: "COMPANY" },
+    // 🔹 Fetch company details with related data
+    const company = await prisma.users.findUnique({
+      where: { id: Number(id) },
       include: {
-        user_plans: {
-          include: {
-            plan: true, // ✅ Fetch related plan details
+        user_plans: true,
+        created_users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            created_at: true,
           },
         },
       },
-      orderBy: { created_at: "desc" },
     });
 
+    if (!company || company.role !== "COMPANY") {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
+    }
+
+    // ✅ Format response to match schema and UI needs
+    const formattedCompany = {
+      id: company.id,
+      name: company.name,
+      email: company.email,
+      phone: company.phone,
+      role: company.role,
+      user_role: company.user_role,
+      address: company.address,
+      country: company.country,
+      state: company.state,
+      city: company.city,
+      postal_code: company.postal_code,
+      currency: company.currency,
+      startDate: company.startDate,
+      expireDate: company.expireDate,
+      UserStatus: company.UserStatus,
+      created_at: company.created_at,
+      branding: {
+        company_logo_url: company.company_logo_url,
+        company_dark_logo_url: company.company_dark_logo_url,
+        company_icon_url: company.company_icon_url,
+        favicon_url: company.favicon_url,
+      },
+      user_plans: company.user_plans,
+      team_members: company.created_users, // 👈 users created under this company
+    };
+
     return res.status(200).json({
-      message: "Companies fetched successfully",
-      data: companies,
+      success: true,
+      message: "Company fetched successfully",
+      data: formattedCompany,
     });
   } catch (error) {
-    console.error("Get all companies error:", error);
+    console.error("❌ Get company by ID error:", error);
     return res.status(500).json({
+      success: false,
       message: "Internal server error",
       error: error.message,
     });
   }
 };
 
+// export const getAllCompanies = async (req, res) => {
+//   try {
+//     const companies = await prisma.users.findMany({
+//       where: { role: "COMPANY" },
+//       include: {
+//         user_plans: {
+//           include: {
+//             plan: true, // ✅ Fetch related plan details
+//           },
+//         },
+//       },
+//       orderBy: { created_at: "desc" },
+//     });
+
+//     return res.status(200).json({
+//       message: "Companies fetched successfully",
+//       data: companies,
+//     });
+//   } catch (error) {
+//     console.error("Get all companies error:", error);
+//     return res.status(500).json({
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+export const getAllCompanies = async (req, res) => {
+  try {
+    // 🔹 Fetch all companies (role = COMPANY)
+    const companies = await prisma.users.findMany({
+      where: { role: "COMPANY" },
+      include: {
+        user_plans: {
+          include: {
+            plan: true, // ✅ Include related plan info
+          },
+        },
+        created_users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            created_at: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    if (!companies || companies.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No companies found",
+      });
+    }
+
+    // 🔹 Format each company into a clean UI-ready structure
+    const formattedCompanies = companies.map((company) => ({
+      id: company.id,
+      name: company.name,
+      email: company.email,
+      phone: company.phone,
+      role: company.role,
+      user_role: company.user_role,
+      address: company.address,
+      country: company.country,
+      state: company.state,
+      city: company.city,
+      postal_code: company.postal_code,
+      currency: company.currency,
+      startDate: company.startDate,
+      expireDate: company.expireDate,
+      UserStatus: company.UserStatus,
+      created_at: company.created_at,
+      branding: {
+        company_logo_url: company.company_logo_url,
+        company_dark_logo_url: company.company_dark_logo_url,
+        company_icon_url: company.company_icon_url,
+        favicon_url: company.favicon_url,
+      },
+      user_plans: company.user_plans.map((planData) => ({
+        id: planData.id,
+        status: planData.status,
+        start_date: planData.start_date,
+        end_date: planData.end_date,
+        plan: planData.plan
+          ? {
+              id: planData.plan.id,
+              plan_name: planData.plan.plan_name,
+              duration: planData.plan.duration,
+              amount: planData.plan.amount,
+            }
+          : null,
+      })),
+      team_members: company.created_users,
+    }));
+
+    // ✅ Send formatted response
+    return res.status(200).json({
+      success: true,
+      message: "Companies fetched successfully",
+      count: formattedCompanies.length,
+      data: formattedCompanies,
+    });
+  } catch (error) {
+    console.error("❌ Get all companies error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
 
 export const deleteCompany = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // ✅ Find company
-    const company = await prisma.users.findUnique({ where: { id: parseInt(id) } });
+    const company = await prisma.users.findUnique({
+      where: { id: parseInt(id) },
+    });
     if (!company || company.role !== "COMPANY") {
       return res.status(404).json({ message: "Company not found" });
     }
@@ -603,34 +930,36 @@ export const deleteCompany = async (req, res) => {
 
     // ✅ Delete company from database
     await prisma.users.delete({ where: { id: parseInt(id) } });
-    
+
     return res.status(200).json({ message: "Company deleted successfully" });
   } catch (error) {
     console.error("Delete company error:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
-
-// user creaete under company 
+// user creaete under company
 //all Controler functions related to USER management
 
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, phone, UserStatus, company_id, user_role } = req.body;
-    
+    const { name, email, password, phone, UserStatus, company_id, user_role } =
+      req.body;
+
     // 🧾 Validate required fields
     if (!email || !password || !name || !user_role) {
       return res
-      .status(400)
-      .json({ message: "Name, email, user_role and password are required" });
+        .status(400)
+        .json({ message: "Name, email, user_role and password are required" });
     }
 
     // 🧍‍♂️ Validate company_id (the user who creates others)
     if (!company_id) {
       return res
-      .status(400)
-      .json({ message: "company_id (creator user) is required" });
+        .status(400)
+        .json({ message: "company_id (creator user) is required" });
     }
 
     // Check if the creator user actually exists and is a COMPANY
@@ -643,26 +972,26 @@ export const createUser = async (req, res) => {
         .status(403)
         .json({ message: "Invalid company_id or user is not a COMPANY role" });
     }
-    
+
     // 🧍 Check if user already exists
     const existingUser = await prisma.users.findUnique({
       where: { email },
     });
     if (existingUser) {
       return res
-      .status(409)
-      .json({ message: "User with this email already exists" });
+        .status(409)
+        .json({ message: "User with this email already exists" });
     }
-    
+
     // 🔐 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     // ☁️ Upload profile image if provided
     let profileUrl = null;
     if (req.file) {
       profileUrl = await uploadToCloudinary(req.file.buffer, "users");
     }
-    
+
     // 🏗️ Create USER under the COMPANY
     const newUser = await prisma.users.create({
       data: {
@@ -691,7 +1020,7 @@ export const createUser = async (req, res) => {
         },
       },
     });
-    
+
     return res.status(201).json({
       success: true,
       message: "User created successfully under the company",
@@ -814,7 +1143,7 @@ export const getUsersByCompanyId = async (req, res) => {
       },
       orderBy: { created_at: "desc" },
     });
-    
+
     return res.status(200).json({
       success: true,
       message: "Users fetched successfully for this company",
@@ -891,7 +1220,9 @@ export const deleteUser = async (req, res) => {
 
     // 🛡️ Optional: Prevent deleting COMPANY or SUPERADMIN users
     if (existingUser.role === "COMPANY" || existingUser.role === "SUPERADMIN") {
-      return res.status(403).json({ message: "Cannot delete COMPANY or SUPERADMIN users" });
+      return res
+        .status(403)
+        .json({ message: "Cannot delete COMPANY or SUPERADMIN users" });
     }
 
     // ☁️ Delete profile image from Cloudinary if exists
@@ -900,7 +1231,10 @@ export const deleteUser = async (req, res) => {
         const publicId = existingUser.profile.split("/").pop().split(".")[0];
         await deleteFromCloudinary(publicId);
       } catch (err) {
-        console.warn("⚠️ Failed to delete profile image from Cloudinary:", err.message);
+        console.warn(
+          "⚠️ Failed to delete profile image from Cloudinary:",
+          err.message
+        );
       }
     }
 
