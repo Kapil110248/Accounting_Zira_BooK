@@ -45,6 +45,7 @@ import {
   addStockToWarehouse,
   importWarehousesFromExcel,
   exportWarehousesToExcel,
+  getWarehouseStockDetails,
 } from "../controllers/wareHouses.controller.js";
 
 const router = Router();
@@ -57,6 +58,9 @@ router.get("/", getAllWarehouses);
 
 // ✅ Get warehouses by company ID
 router.get("/company/:company_id", getWarehousesByCompanyId);
+
+// ✅ Get stock summary by warehouse
+router.get("/:company_id/:warehouse_id/stock", getWarehouseStockDetails);
 
 // ✅ Get warehouse details with summary metrics
 router.get("/:id/details", getWarehouseDetails);

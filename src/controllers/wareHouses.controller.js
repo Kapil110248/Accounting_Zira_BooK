@@ -1,4 +1,3 @@
-
 // import prisma from "../config/db.js";
 
 // // Utility: Convert to number safely (for Decimal/BigInt)
@@ -101,7 +100,7 @@
 // // export const getAllWarehouses = async (req, res) => {
 // //     try {
 // //       const warehouses = await prisma.warehouses.findMany();
-  
+
 // //       // Extract unique company IDs
 // //       const companyIds = [
 // //         ...new Set(
@@ -110,7 +109,7 @@
 // //             .filter(id => id !== null)
 // //         )
 // //       ];
-  
+
 // //       // Fetch all relevant companies in one query
 // //       const companiesMap = {};
 // //       if (companyIds.length > 0) {
@@ -122,14 +121,14 @@
 // //           companiesMap[c.id] = c.name;
 // //         });
 // //       }
-  
+
 // //       const formattedWarehouses = warehouses.map(w => ({
 // //         ...w,
 // //         id: toNumber(w.id),
 // //         company_id: w.company_id ? toNumber(w.company_id) : null,
 // //         company_name: w.company_id ? companiesMap[w.company_id] || null : null,
 // //       }));
-  
+
 // //       return res.status(200).json({
 // //         success: true,
 // //         message: "Warehouses fetched successfully",
@@ -183,19 +182,19 @@
 //   //   try {
 //   //     const { id } = req.params;
 //   //     const warehouseId = parseInt(id);
-  
+
 //   //     if (isNaN(warehouseId)) {
 //   //       return res.status(400).json({ success: false, message: "Invalid warehouse ID" });
 //   //     }
-  
+
 //   //     const warehouse = await prisma.warehouses.findUnique({
 //   //       where: { id: warehouseId },
 //   //     });
-  
+
 //   //     if (!warehouse) {
 //   //       return res.status(404).json({ success: false, message: "Warehouse not found" });
 //   //     }
-  
+
 //   //     let company_name = null;
 //   //     if (warehouse.company_id) {
 //   //       const company = await prisma.companies.findUnique({
@@ -204,14 +203,14 @@
 //   //       });
 //   //       company_name = company?.name || null;
 //   //     }
-  
+
 //   //     const formattedWarehouse = {
 //   //       ...warehouse,
 //   //       id: toNumber(warehouse.id),
 //   //       company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
 //   //       company_name,
 //   //     };
-  
+
 //   //     return res.status(200).json({
 //   //       success: true,
 //   //       message: "Warehouse fetched successfully",
@@ -313,8 +312,6 @@
 // //   }
 // // };
 
-
-
 // export const deleteWarehouse = async (req, res) => {
 //   try {
 //     const { id } = req.params;
@@ -361,7 +358,6 @@
 //   }
 // };
 
-
 import prisma from "../config/db.js";
 import { uploadToCloudinary } from "../config/cloudinary.js";
 import * as XLSX from "xlsx";
@@ -369,7 +365,7 @@ import * as XLSX from "xlsx";
 // Utility: Convert to number safely (for Decimal/BigInt)
 const toNumber = (val) => {
   if (val == null) return 0;
-  if (typeof val === 'object' && typeof val.toNumber === 'function') {
+  if (typeof val === "object" && typeof val.toNumber === "function") {
     return val.toNumber();
   }
   return Number(val);
@@ -378,21 +374,23 @@ const toNumber = (val) => {
 // ✅ Create Warehouse
 export const createWarehouse = async (req, res) => {
   try {
-    const { 
-      company_id, 
-      warehouse_name, 
+    const {
+      company_id,
+      warehouse_name,
       location,
       address_line1,
       address_line2,
       city,
       state,
       pincode,
-      country
+      country,
     } = req.body;
 
     // Validate required fields
     if (!warehouse_name) {
-      return res.status(400).json({ success: false, message: "Warehouse name is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse name is required" });
     }
 
     const newWarehouse = await prisma.warehouses.create({
@@ -414,7 +412,9 @@ export const createWarehouse = async (req, res) => {
       message: "Warehouse created successfully",
       data: {
         id: toNumber(newWarehouse.id),
-        company_id: newWarehouse.company_id ? toNumber(newWarehouse.company_id) : null,
+        company_id: newWarehouse.company_id
+          ? toNumber(newWarehouse.company_id)
+          : null,
         warehouse_name: newWarehouse.warehouse_name,
         location: newWarehouse.location,
         address_line1: newWarehouse.address_line1,
@@ -450,7 +450,7 @@ export const getAllWarehouses = async (req, res) => {
     if (search) {
       where.OR = [
         { warehouse_name: { contains: search } },
-        { location: { contains: search } }
+        { location: { contains: search } },
       ];
     }
 
@@ -466,7 +466,7 @@ export const getAllWarehouses = async (req, res) => {
         skip,
         take: limitNum,
       }),
-      prisma.warehouses.count({ where })
+      prisma.warehouses.count({ where }),
     ]);
 
     // Calculate total stocks for each warehouse
@@ -474,16 +474,18 @@ export const getAllWarehouses = async (req, res) => {
       warehouses.map(async (warehouse) => {
         const totalStocks = await prisma.products.aggregate({
           where: { warehouse_id: warehouse.id },
-          _sum: { initial_qty: true }
+          _sum: { initial_qty: true },
         });
 
         return {
           id: toNumber(warehouse.id),
-          company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
+          company_id: warehouse.company_id
+            ? toNumber(warehouse.company_id)
+            : null,
           warehouse_name: warehouse.warehouse_name,
           location: warehouse.location,
           total_stocks: toNumber(totalStocks._sum.initial_qty || 0),
-          created_at: warehouse.created_at
+          created_at: warehouse.created_at,
         };
       })
     );
@@ -498,8 +500,8 @@ export const getAllWarehouses = async (req, res) => {
         total_records: totalCount,
         total_pages: Math.ceil(totalCount / limitNum),
         showing_from: totalCount > 0 ? skip + 1 : 0,
-        showing_to: Math.min(skip + limitNum, totalCount)
-      }
+        showing_to: Math.min(skip + limitNum, totalCount),
+      },
     });
   } catch (error) {
     console.error("Error fetching warehouses:", error);
@@ -511,20 +513,52 @@ export const getAllWarehouses = async (req, res) => {
   }
 };
 
+
+
+
+
 export const getWarehousesByCompanyId = async (req, res) => {
   try {
     const { company_id } = req.params;
 
     if (!company_id) {
-      return res.status(400).json({ success: false, message: "Company ID is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Company ID is required",
+      });
     }
 
+    // ✅ Fetch all warehouses for the company
     const warehouses = await prisma.warehouses.findMany({
       where: { company_id: toNumber(company_id) },
       orderBy: { id: "desc" },
     });
 
-    const formattedWarehouses = warehouses.map(warehouse => ({
+    if (warehouses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No warehouses found for this company",
+        data: [],
+      });
+    }
+
+    // ✅ Get total stock per warehouse in one go
+    const stockData = await prisma.product_warehouses.groupBy({
+      by: ["warehouse_id"],
+      _sum: { stock_qty: true },
+      where: {
+        warehouse_id: { in: warehouses.map((w) => w.id) },
+      },
+    });
+
+    // Convert grouped results into a map for fast lookup
+    const stockMap = stockData.reduce((acc, item) => {
+      acc[item.warehouse_id] = item._sum.stock_qty || 0;
+      return acc;
+    }, {});
+
+    // ✅ Format warehouses with totalStocks key
+    const formattedWarehouses = warehouses.map((warehouse) => ({
       id: toNumber(warehouse.id),
       company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
       warehouse_name: warehouse.warehouse_name,
@@ -536,15 +570,17 @@ export const getWarehousesByCompanyId = async (req, res) => {
       pincode: warehouse.pincode,
       country: warehouse.country,
       created_at: warehouse.created_at,
+      totalStocks: stockMap[warehouse.id] || 0, // ✅ total stock from product_warehouses
     }));
 
+    // ✅ Response
     return res.status(200).json({
       success: true,
-      message: "Warehouses fetched successfully for the company",
+      message: "Warehouses fetched successfully with total stocks",
       data: formattedWarehouses,
     });
   } catch (error) {
-    console.error("Error fetching warehouses by company:", error);
+    console.error("❌ Error fetching warehouses by company:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch warehouses by company",
@@ -553,10 +589,11 @@ export const getWarehousesByCompanyId = async (req, res) => {
   }
 };
 
+
 // export const getAllWarehouses = async (req, res) => {
 //     try {
 //       const warehouses = await prisma.warehouses.findMany();
-  
+
 //       // Extract unique company IDs
 //       const companyIds = [
 //         ...new Set(
@@ -565,7 +602,7 @@ export const getWarehousesByCompanyId = async (req, res) => {
 //             .filter(id => id !== null)
 //         )
 //       ];
-  
+
 //       // Fetch all relevant companies in one query
 //       const companiesMap = {};
 //       if (companyIds.length > 0) {
@@ -577,14 +614,14 @@ export const getWarehousesByCompanyId = async (req, res) => {
 //           companiesMap[c.id] = c.name;
 //         });
 //       }
-  
+
 //       const formattedWarehouses = warehouses.map(w => ({
 //         ...w,
 //         id: toNumber(w.id),
 //         company_id: w.company_id ? toNumber(w.company_id) : null,
 //         company_name: w.company_id ? companiesMap[w.company_id] || null : null,
 //       }));
-  
+
 //       return res.status(200).json({
 //         success: true,
 //         message: "Warehouses fetched successfully",
@@ -606,7 +643,9 @@ export const getWarehouseById = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "Warehouse ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse ID is required" });
     }
 
     const warehouse = await prisma.warehouses.findUnique({
@@ -625,7 +664,9 @@ export const getWarehouseById = async (req, res) => {
       message: "Warehouse fetched successfully",
       data: {
         id: toNumber(warehouse.id),
-        company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
+        company_id: warehouse.company_id
+          ? toNumber(warehouse.company_id)
+          : null,
         warehouse_name: warehouse.warehouse_name,
         location: warehouse.location,
         address_line1: warehouse.address_line1,
@@ -654,7 +695,9 @@ export const getWarehouseDetails = async (req, res) => {
     const { company_id } = req.query;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "Warehouse ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse ID is required" });
     }
 
     const warehouseId = toNumber(id);
@@ -683,16 +726,21 @@ export const getWarehouseDetails = async (req, res) => {
         item_category: {
           select: {
             id: true,
-            item_category_name: true
-          }
-        }
-      }
+            item_category_name: true,
+          },
+        },
+      },
     });
 
     // Calculate summary metrics
-    const totalCategories = new Set(products.map(p => p.item_category_id).filter(Boolean)).size;
+    const totalCategories = new Set(
+      products.map((p) => p.item_category_id).filter(Boolean)
+    ).size;
     const totalProducts = products.length;
-    const totalStockUnits = products.reduce((sum, p) => sum + toNumber(p.initial_qty || 0), 0);
+    const totalStockUnits = products.reduce(
+      (sum, p) => sum + toNumber(p.initial_qty || 0),
+      0
+    );
 
     // Find lowest and highest stock products
     let lowestStockProduct = null;
@@ -700,20 +748,20 @@ export const getWarehouseDetails = async (req, res) => {
     let lowestQty = Infinity;
     let highestQty = -Infinity;
 
-    products.forEach(product => {
+    products.forEach((product) => {
       const qty = toNumber(product.initial_qty || 0);
       if (qty < lowestQty && qty > 0) {
         lowestQty = qty;
         lowestStockProduct = {
-          name: product.item_name || 'N/A',
-          quantity: qty
+          name: product.item_name || "N/A",
+          quantity: qty,
         };
       }
       if (qty > highestQty) {
         highestQty = qty;
         highestStockProduct = {
-          name: product.item_name || 'N/A',
-          quantity: qty
+          name: product.item_name || "N/A",
+          quantity: qty,
         };
       }
     });
@@ -723,7 +771,9 @@ export const getWarehouseDetails = async (req, res) => {
       message: "Warehouse details fetched successfully",
       data: {
         id: toNumber(warehouse.id),
-        company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
+        company_id: warehouse.company_id
+          ? toNumber(warehouse.company_id)
+          : null,
         warehouse_name: warehouse.warehouse_name,
         location: warehouse.location,
         address_line1: warehouse.address_line1,
@@ -737,10 +787,16 @@ export const getWarehouseDetails = async (req, res) => {
           total_categories: totalCategories,
           total_products: totalProducts,
           total_stock_units: totalStockUnits,
-          lowest_stock_product: lowestStockProduct || { name: "N/A", quantity: 0 },
-          highest_stock_product: highestStockProduct || { name: "N/A", quantity: 0 }
-        }
-      }
+          lowest_stock_product: lowestStockProduct || {
+            name: "N/A",
+            quantity: 0,
+          },
+          highest_stock_product: highestStockProduct || {
+            name: "N/A",
+            quantity: 0,
+          },
+        },
+      },
     });
   } catch (error) {
     console.error("Error fetching warehouse details:", error);
@@ -756,10 +812,19 @@ export const getWarehouseDetails = async (req, res) => {
 export const getWarehouseInventory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { company_id, category_id, stock_level, search, page = 1, limit = 10 } = req.query;
+    const {
+      company_id,
+      category_id,
+      stock_level,
+      search,
+      page = 1,
+      limit = 10,
+    } = req.query;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "Warehouse ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse ID is required" });
     }
 
     const warehouseId = toNumber(id);
@@ -788,7 +853,7 @@ export const getWarehouseInventory = async (req, res) => {
       where.OR = [
         { item_name: { contains: search } },
         { sku: { contains: search } },
-        { barcode: { contains: search } }
+        { barcode: { contains: search } },
       ];
     }
 
@@ -799,23 +864,25 @@ export const getWarehouseInventory = async (req, res) => {
         item_category: {
           select: {
             id: true,
-            item_category_name: true
-          }
-        }
+            item_category_name: true,
+          },
+        },
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: "desc" },
     });
 
     // Filter by stock level if provided
-    if (stock_level && stock_level !== 'all') {
+    if (stock_level && stock_level !== "all") {
       const stockLevels = {
         low: (qty) => qty > 0 && qty <= 20,
         medium: (qty) => qty > 20 && qty <= 50,
-        high: (qty) => qty > 50
+        high: (qty) => qty > 50,
       };
 
       if (stockLevels[stock_level.toLowerCase()]) {
-        products = products.filter(p => stockLevels[stock_level.toLowerCase()](toNumber(p.initial_qty || 0)));
+        products = products.filter((p) =>
+          stockLevels[stock_level.toLowerCase()](toNumber(p.initial_qty || 0))
+        );
       }
     }
 
@@ -823,10 +890,10 @@ export const getWarehouseInventory = async (req, res) => {
     const inventoryList = products.map((product, index) => ({
       id: index + 1,
       product_id: toNumber(product.id),
-      category: product.item_category?.item_category_name || 'N/A',
-      product: product.item_name || 'N/A',
-      measurement: 'Pieces', // Default, can be enhanced with UOM
-      stock: toNumber(product.initial_qty || 0)
+      category: product.item_category?.item_category_name || "N/A",
+      product: product.item_name || "N/A",
+      measurement: "Pieces", // Default, can be enhanced with UOM
+      stock: toNumber(product.initial_qty || 0),
     }));
 
     // Calculate total stock
@@ -850,8 +917,8 @@ export const getWarehouseInventory = async (req, res) => {
         total_records: inventoryList.length,
         total_pages: Math.ceil(inventoryList.length / limitNum),
         showing_from: inventoryList.length > 0 ? startIndex + 1 : 0,
-        showing_to: Math.min(endIndex, inventoryList.length)
-      }
+        showing_to: Math.min(endIndex, inventoryList.length),
+      },
     });
   } catch (error) {
     console.error("Error fetching warehouse inventory:", error);
@@ -863,71 +930,73 @@ export const getWarehouseInventory = async (req, res) => {
   }
 };
 
-  // export const getWarehouseById = async (req, res) => {
-  //   try {
-  //     const { id } = req.params;
-  //     const warehouseId = parseInt(id);
-  
-  //     if (isNaN(warehouseId)) {
-  //       return res.status(400).json({ success: false, message: "Invalid warehouse ID" });
-  //     }
-  
-  //     const warehouse = await prisma.warehouses.findUnique({
-  //       where: { id: warehouseId },
-  //     });
-  
-  //     if (!warehouse) {
-  //       return res.status(404).json({ success: false, message: "Warehouse not found" });
-  //     }
-  
-  //     let company_name = null;
-  //     if (warehouse.company_id) {
-  //       const company = await prisma.companies.findUnique({
-  //         where: { id: warehouse.company_id },
-  //         select: { name: true }
-  //       });
-  //       company_name = company?.name || null;
-  //     }
-  
-  //     const formattedWarehouse = {
-  //       ...warehouse,
-  //       id: toNumber(warehouse.id),
-  //       company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
-  //       company_name,
-  //     };
-  
-  //     return res.status(200).json({
-  //       success: true,
-  //       message: "Warehouse fetched successfully",
-  //       data: formattedWarehouse,
-  //     });
-  //   } catch (error) {
-  //     console.error("Error fetching warehouse by ID:", error);
-  //     return res.status(500).json({
-  //       success: false,
-  //       message: "Failed to fetch warehouse",
-  //       error: error.message,
-  //     });
-  //   }
-  // };
+// export const getWarehouseById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const warehouseId = parseInt(id);
+
+//     if (isNaN(warehouseId)) {
+//       return res.status(400).json({ success: false, message: "Invalid warehouse ID" });
+//     }
+
+//     const warehouse = await prisma.warehouses.findUnique({
+//       where: { id: warehouseId },
+//     });
+
+//     if (!warehouse) {
+//       return res.status(404).json({ success: false, message: "Warehouse not found" });
+//     }
+
+//     let company_name = null;
+//     if (warehouse.company_id) {
+//       const company = await prisma.companies.findUnique({
+//         where: { id: warehouse.company_id },
+//         select: { name: true }
+//       });
+//       company_name = company?.name || null;
+//     }
+
+//     const formattedWarehouse = {
+//       ...warehouse,
+//       id: toNumber(warehouse.id),
+//       company_id: warehouse.company_id ? toNumber(warehouse.company_id) : null,
+//       company_name,
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Warehouse fetched successfully",
+//       data: formattedWarehouse,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching warehouse by ID:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch warehouse",
+//       error: error.message,
+//     });
+//   }
+// };
 
 // ✅ Update Warehouse
 export const updateWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      warehouse_name, 
+    const {
+      warehouse_name,
       location,
       address_line1,
       address_line2,
       city,
       state,
       pincode,
-      country
+      country,
     } = req.body;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "Warehouse ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse ID is required" });
     }
 
     const warehouseId = parseInt(id);
@@ -938,12 +1007,15 @@ export const updateWarehouse = async (req, res) => {
     });
 
     if (!existingWarehouse) {
-      return res.status(404).json({ success: false, message: "Warehouse not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Warehouse not found" });
     }
 
     // Build update data object (only include fields that are provided)
     const updateData = {};
-    if (warehouse_name !== undefined) updateData.warehouse_name = warehouse_name;
+    if (warehouse_name !== undefined)
+      updateData.warehouse_name = warehouse_name;
     if (location !== undefined) updateData.location = location;
     if (address_line1 !== undefined) updateData.address_line1 = address_line1;
     if (address_line2 !== undefined) updateData.address_line2 = address_line2;
@@ -962,7 +1034,9 @@ export const updateWarehouse = async (req, res) => {
       message: "Warehouse updated successfully",
       data: {
         id: toNumber(updatedWarehouse.id),
-        company_id: updatedWarehouse.company_id ? toNumber(updatedWarehouse.company_id) : null,
+        company_id: updatedWarehouse.company_id
+          ? toNumber(updatedWarehouse.company_id)
+          : null,
         warehouse_name: updatedWarehouse.warehouse_name,
         location: updatedWarehouse.location,
         address_line1: updatedWarehouse.address_line1,
@@ -989,7 +1063,9 @@ export const deleteWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) {
-      return res.status(400).json({ success: false, message: "Warehouse ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Warehouse ID is required" });
     }
 
     const warehouseId = parseInt(id);
@@ -1000,7 +1076,9 @@ export const deleteWarehouse = async (req, res) => {
     });
 
     if (!existingWarehouse) {
-      return res.status(404).json({ success: false, message: "Warehouse not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Warehouse not found" });
     }
 
     await prisma.warehouses.delete({
@@ -1132,7 +1210,9 @@ export const addStockToWarehouse = async (req, res) => {
         as_of_date: date || null,
         initial_cost: cost ? toNumber(cost) : null,
         sale_price: salePriceExclusive ? toNumber(salePriceExclusive) : null,
-        purchase_price: salePriceInclusive ? toNumber(salePriceInclusive) : null,
+        purchase_price: salePriceInclusive
+          ? toNumber(salePriceInclusive)
+          : null,
         discount: discount ? toNumber(discount) : null,
         tax_account: taxAccount || null,
         remarks: remarks || null,
@@ -1163,7 +1243,9 @@ export const addStockToWarehouse = async (req, res) => {
         company_id: product.company_id ? toNumber(product.company_id) : null,
         warehouse_id: toNumber(product.warehouse_id),
         warehouse_name: product.warehouse?.warehouse_name,
-        item_category_id: product.item_category_id ? toNumber(product.item_category_id) : null,
+        item_category_id: product.item_category_id
+          ? toNumber(product.item_category_id)
+          : null,
         item_category_name: product.item_category?.item_category_name,
         item_name: product.item_name,
         hsn: product.hsn,
@@ -1171,11 +1253,17 @@ export const addStockToWarehouse = async (req, res) => {
         sku: product.sku,
         description: product.description,
         initial_qty: toNumber(product.initial_qty || 0),
-        min_order_qty: product.min_order_qty ? toNumber(product.min_order_qty) : null,
+        min_order_qty: product.min_order_qty
+          ? toNumber(product.min_order_qty)
+          : null,
         as_of_date: product.as_of_date,
-        initial_cost: product.initial_cost ? toNumber(product.initial_cost) : null,
+        initial_cost: product.initial_cost
+          ? toNumber(product.initial_cost)
+          : null,
         sale_price: product.sale_price ? toNumber(product.sale_price) : null,
-        purchase_price: product.purchase_price ? toNumber(product.purchase_price) : null,
+        purchase_price: product.purchase_price
+          ? toNumber(product.purchase_price)
+          : null,
         discount: product.discount ? toNumber(product.discount) : null,
         tax_account: product.tax_account,
         remarks: product.remarks,
@@ -1244,11 +1332,7 @@ export const importWarehousesFromExcel = async (req, res) => {
         continue;
       }
 
-      const location =
-        row["Location"] ||
-        row["location"] ||
-        row["City"] ||
-        "";
+      const location = row["Location"] || row["location"] || row["City"] || "";
 
       const data = {
         warehouse_name: String(warehouseName).trim(),
@@ -1344,10 +1428,7 @@ export const exportWarehousesToExcel = async (req, res) => {
     const timestamp = new Date().toISOString().split("T")[0];
     const filename = `warehouses-export-${timestamp}.xlsx`;
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1363,3 +1444,177 @@ export const exportWarehousesToExcel = async (req, res) => {
     });
   }
 };
+
+// ✅ Get stock summary by warehouse
+
+export const getWarehouseStockDetails = async (req, res) => {
+  try {
+    const { warehouse_id, company_id } = req.params;
+
+    if (!warehouse_id || !company_id) {
+      return res.status(400).json({
+        success: false,
+        message: "warehouse_id and company_id are required",
+      });
+    }
+
+    // ✅ Fetch warehouse info
+    const warehouse = await prisma.warehouses.findUnique({
+      where: { id: Number(warehouse_id) },
+    });
+
+    if (!warehouse) {
+      return res.status(404).json({
+        success: false,
+        message: "Warehouse not found",
+      });
+    }
+
+    // ✅ Fetch products + stock data
+    const productsInWarehouse = await prisma.product_warehouses.findMany({
+      where: { warehouse_id: Number(warehouse_id) },
+      include: {
+        product: {
+          include: {
+            item_category: true,
+            unit_detail: true,
+          },
+        },
+      },
+      orderBy: { product_id: "asc" },
+    });
+
+    // ✅ Handle empty warehouse
+    if (productsInWarehouse.length === 0) {
+      return res.status(200).json({
+        success: true,
+        warehouse,
+        totalStocks: 0,
+        summary: {
+          totalCategories: 0,
+          totalProducts: 0,
+          totalStockValue: 0,
+        },
+        highestStockProduct: null,
+        lowestStockProduct: null,
+        categoryWiseSummary: [],
+        inventoryList: [],
+      });
+    }
+
+    // ✅ Compute totals
+    const totalProducts = productsInWarehouse.length;
+    const totalStocks = productsInWarehouse.reduce(
+      (sum, p) => sum + (p.stock_qty || 0),
+      0
+    );
+
+    const totalStockValue = productsInWarehouse.reduce(
+      (sum, p) =>
+        sum +
+        ((p.stock_qty || 0) * (Number(p.product?.purchase_price) || 0)),
+      0
+    );
+
+    // ✅ Category-wise stock summary
+    const categoryMap = {};
+    productsInWarehouse.forEach((p) => {
+      const categoryName =
+        p.product?.item_category?.item_category_name || "Uncategorized";
+
+      if (!categoryMap[categoryName]) {
+        categoryMap[categoryName] = { totalItems: 0, totalStock: 0, totalValue: 0 };
+      }
+
+      categoryMap[categoryName].totalItems += 1;
+      categoryMap[categoryName].totalStock += p.stock_qty || 0;
+      categoryMap[categoryName].totalValue +=
+        (p.stock_qty || 0) * (Number(p.product?.purchase_price) || 0);
+    });
+
+    const categoryWiseSummary = Object.entries(categoryMap).map(
+      ([category, data]) => ({
+        category,
+        totalItems: data.totalItems,
+        totalStock: data.totalStock,
+        totalValue: data.totalValue.toFixed(2),
+      })
+    );
+
+    // ✅ Find highest and lowest stock product
+    let highestStockProduct = null;
+    let lowestStockProduct = null;
+
+    productsInWarehouse.forEach((p) => {
+      if (
+        !highestStockProduct ||
+        (p.stock_qty || 0) > (highestStockProduct.stock_qty || 0)
+      ) {
+        highestStockProduct = p;
+      }
+      if (
+        !lowestStockProduct ||
+        (p.stock_qty || 0) < (lowestStockProduct.stock_qty || 0)
+      ) {
+        lowestStockProduct = p;
+      }
+    });
+
+    // ✅ Prepare product list
+    const inventoryList = productsInWarehouse.map((p, index) => ({
+      index: index + 1,
+      category: p.product?.item_category?.item_category_name || "Uncategorized",
+      product_name: p.product?.item_name,
+      measurement:
+        p.product?.unit_detail?.weight_per_unit != null
+          ? `${p.product.unit_detail.weight_per_unit} Units`
+          : "-",
+      stock: p.stock_qty || 0,
+      purchase_price: Number(p.product?.purchase_price) || 0,
+      total_value: (
+        (p.stock_qty || 0) * (Number(p.product?.purchase_price) || 0)
+      ).toFixed(2),
+    }));
+
+    // ✅ Final Response
+    res.status(200).json({
+      success: true,
+      warehouse: {
+        id: warehouse.id,
+        warehouse_name: warehouse.warehouse_name,
+        location: warehouse.location,
+        address_line1: warehouse.address_line1,
+        address_line2: warehouse.address_line2,
+        city: warehouse.city,
+        state: warehouse.state,
+        pincode: warehouse.pincode,
+        country: warehouse.country,
+      },
+      totalStocks, // 👈 main key you wanted
+      summary: {
+        totalCategories: Object.keys(categoryMap).length,
+        totalProducts,
+        totalStockValue: totalStockValue.toFixed(2),
+      },
+      highestStockProduct: {
+        name: highestStockProduct?.product?.item_name || null,
+        qty: highestStockProduct?.stock_qty || 0,
+      },
+      lowestStockProduct: {
+        name: lowestStockProduct?.product?.item_name || null,
+        qty: lowestStockProduct?.stock_qty || 0,
+      },
+      categoryWiseSummary,
+      inventoryList,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching warehouse stock:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+

@@ -18,6 +18,7 @@ export const createposinvoice = async (req, res) => {
       currency,
     } = req.body;
 
+    // ✅ Validate required fields
     if (!company_id || !customer_id || !products?.length) {
       return res.status(400).json({
         success: false,
@@ -25,7 +26,9 @@ export const createposinvoice = async (req, res) => {
       });
     }
 
+    // ✅ Create invoice and related products within a transaction
     const invoice = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Create the invoice
       const newInvoice = await tx.pos_invoices.create({
         data: {
           company_id: Number(company_id),
@@ -39,21 +42,88 @@ export const createposinvoice = async (req, res) => {
         },
       });
 
+      // 2️⃣ Prepare invoice products including warehouse_id
       const invoiceProducts = products.map((item) => ({
         invoice_id: newInvoice.id,
         product_id: Number(item.product_id),
+        warehouse_id: item.warehouse_id ? Number(item.warehouse_id) : null,
         quantity: Number(item.quantity),
         price: Number(item.price),
       }));
 
+      // 3️⃣ Save all invoice products
       await tx.pos_invoice_products.createMany({ data: invoiceProducts });
-      return newInvoice;
+
+      // 4️⃣ Fetch full invoice details including warehouse & product
+      const fullInvoice = await tx.pos_invoices.findUnique({
+        where: { id: newInvoice.id },
+        include: {
+          products: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  item_name: true,
+                },
+              },
+              warehouse: {
+                select: {
+                  id: true,
+                  warehouse_name: true,
+                },
+              },
+            },
+          },
+          customer: {
+            select: {
+              id: true,
+              name_english: true,
+              email: true,
+              phone: true,
+              address: true,
+            },
+          },
+          tax_class: {
+            select: {
+              tax_class: true,
+              tax_value: true,
+            },
+          },
+        },
+      });
+
+      return fullInvoice;
     });
 
-    res.status(201).json({
+    // ✅ Cleaned response structure
+    return res.status(201).json({
       success: true,
-      message: "Invoice created successfully",
-      data: invoice,
+      message: "✅ Invoice created successfully with warehouse mapping",
+      data: {
+        id: invoice.id,
+        company_id: invoice.company_id,
+        customer_id: invoice.customer_id,
+        tax_id: invoice.tax_id,
+        subtotal: invoice.subtotal,
+        total: invoice.total,
+        payment_status: invoice.payment_status,
+        symbol: invoice.symbol,
+        currency: invoice.currency,
+        created_at: invoice.created_at,
+        customer: invoice.customer,
+        tax: invoice.tax_class
+          ? {
+              tax_class: invoice.tax_class.tax_class,
+              tax_value: invoice.tax_class.tax_value,
+            }
+          : null,
+        products: invoice.products.map((p) => ({
+          product_id: p.product_id,
+          item_name: p.product?.item_name || null,
+          warehouse_id: p.warehouse?.id || null,
+          warehouse_name: p.warehouse?.warehouse_name || null,
+        })),
+      },
     });
   } catch (error) {
     console.error("❌ createposinvoice Error:", error);
@@ -65,18 +135,21 @@ export const createposinvoice = async (req, res) => {
   }
 };
 
+
 // 📌 Get All Invoices by Company
 export const getAllinvoice = async (req, res) => {
   try {
     const { company_id } = req.params;
 
-    if (!company_id) {
+    // ✅ Validate company_id
+    if (!company_id || isNaN(company_id)) {
       return res.status(400).json({
         success: false,
-        message: "company_id is required",
+        message: "Valid company_id is required",
       });
     }
 
+    // ✅ Fetch all invoices with related data
     const invoices = await prisma.pos_invoices.findMany({
       where: { company_id: Number(company_id) },
       orderBy: { created_at: "desc" },
@@ -89,6 +162,11 @@ export const getAllinvoice = async (req, res) => {
                 item_name: true,
               },
             },
+            warehouse: {
+              select: {
+                warehouse_name: true, // ✅ Only warehouse name
+              },
+            },
           },
         },
         customer: {
@@ -97,10 +175,10 @@ export const getAllinvoice = async (req, res) => {
             name_english: true,
             email: true,
             phone: true,
-            address: true, // ✅ Added field
+            address: true,
           },
         },
-        tax: {
+        tax_class: {
           select: {
             tax_class: true,
             tax_value: true,
@@ -109,32 +187,52 @@ export const getAllinvoice = async (req, res) => {
       },
     });
 
-    if (invoices.length === 0) {
+    // ✅ Handle no invoices found
+    if (!invoices.length) {
       return res.status(404).json({
         success: false,
         message: "No invoices found for this company",
       });
     }
 
-    const formattedInvoices = invoices.map((inv) => ({
-      ...inv,
-      products: inv.products.map((p) => ({
-        id: p.id,
-        product_id: p.product_id,
-        item_name: p.product?.item_name || null,
-        quantity: p.quantity,
-        price: p.price,
-      })),
-      tax: inv.tax
+    // ✅ Format response
+    const formattedInvoices = invoices.map((invoice) => ({
+      id: invoice.id,
+      company_id: invoice.company_id,
+      subtotal: invoice.subtotal,
+      total: invoice.total,
+      payment_status: invoice.payment_status,
+      created_at: invoice.created_at,
+
+      customer: invoice.customer
         ? {
-            tax_class: inv.tax.tax_class,
-            tax_value: inv.tax.tax_value,
+            id: invoice.customer.id,
+            name_english: invoice.customer.name_english,
+            email: invoice.customer.email,
+            phone: invoice.customer.phone,
+            address: invoice.customer.address,
           }
         : null,
+
+      tax: invoice.tax_class
+        ? {
+            tax_class: invoice.tax_class.tax_class,
+            tax_value: invoice.tax_class.tax_value,
+          }
+        : null,
+
+      products:
+        invoice.products?.map((p) => ({
+          product_id: p.product_id,
+          item_name: p.product?.item_name || null,
+          warehouse_name: p.warehouse?.warehouse_name || null, // ✅ only warehouse name
+        })) || [],
     }));
 
+    // ✅ Send final structured response
     return res.status(200).json({
       success: true,
+      message: "✅ Invoices fetched successfully",
       count: formattedInvoices.length,
       data: formattedInvoices,
     });
@@ -147,6 +245,8 @@ export const getAllinvoice = async (req, res) => {
     });
   }
 };
+
+
 
 // 📌 Get Single Invoice by ID (same structure)
 export const getinvoiceById = async (req, res) => {

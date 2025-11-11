@@ -11,7 +11,7 @@ export const createTransaction = async (req, res) => {
   try {
     const {
       date,
-      company_id,
+      company_id, 
       balance_type,
       voucher_type,
       voucher_no,

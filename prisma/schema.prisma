@@ -289,6 +289,7 @@ model warehouses {
   // ✅ New Many-to-Many Relation
   product_warehouses product_warehouses[]
   transfer_items     transfer_items[]
+   pos_invoice_products pos_invoice_products[] 
 }
 
 //-------- item_category ---------- //
@@ -639,10 +640,12 @@ model pos_invoice_products {
   product_id Int
   quantity   Int
   price      Decimal @db.Decimal(10, 2)
+  warehouse_id  Int?
 
   
   invoice pos_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
   product products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  warehouse     warehouses?  @relation(fields: [warehouse_id], references: [id], onDelete: SetNull)
 }
 
 

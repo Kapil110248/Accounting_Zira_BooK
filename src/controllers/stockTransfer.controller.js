@@ -125,6 +125,110 @@ export const createTransfer = async (req, res) => {
   }
 };
 
+
+
+export const updateTransfer = async (req, res) => {
+  try {
+    const { id } = req.params; // transfer ID
+    const {
+      company_id,
+      voucher_no,
+      manual_voucher_no,
+      transfer_date,
+      destination_warehouse_id,
+      notes,
+      items, // updated array of transfer items
+    } = req.body;
+
+    // 🧩 Validate
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Transfer ID is required",
+      });
+    }
+
+    // Check if transfer exists
+    const existingTransfer = await prisma.transfers.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!existingTransfer) {
+      return res.status(404).json({
+        success: false,
+        message: "Transfer not found",
+      });
+    }
+
+    // 🗓️ Parse date
+    const parsedDate = transfer_date ? new Date(transfer_date) : existingTransfer.transfer_date;
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid transfer date" });
+    }
+
+    // 🧾 Parse items safely
+    let parsedItems = [];
+    if (items) {
+      parsedItems = typeof items === "string" ? JSON.parse(items) : items;
+    }
+
+    // ✅ Run transaction for update consistency
+    const updatedTransfer = await prisma.$transaction(async (tx) => {
+      // Update main transfer
+      const updated = await tx.transfers.update({
+        where: { id: Number(id) },
+        data: {
+          company_id: company_id ? Number(company_id) : existingTransfer.company_id,
+          voucher_no: voucher_no ?? existingTransfer.voucher_no,
+          manual_voucher_no: manual_voucher_no ?? existingTransfer.manual_voucher_no,
+          transfer_date: parsedDate,
+          destination_warehouse_id: destination_warehouse_id
+            ? Number(destination_warehouse_id)
+            : existingTransfer.destination_warehouse_id,
+          notes: notes ?? existingTransfer.notes,
+        },
+      });
+
+      // ✅ Update items only if provided
+      if (parsedItems.length > 0) {
+        // Delete old transfer items
+        await tx.transfer_items.deleteMany({
+          where: { transfer_id: Number(id) },
+        });
+
+        // Insert new ones
+        const formattedItems = parsedItems.map((item) => ({
+          transfer_id: Number(id),
+          product_id: Number(item.product_id),
+          source_warehouse_id: Number(item.source_warehouse_id),
+          qty: new Prisma.Decimal(item.qty || 0),
+          rate: new Prisma.Decimal(item.rate || 0),
+          narration: item.narration || null,
+        }));
+
+        await tx.transfer_items.createMany({ data: formattedItems });
+      }
+
+      return updated;
+    });
+
+    // ✅ Return success
+    res.status(200).json({
+      success: true,
+      message: "Transfer updated successfully",
+      data: updatedTransfer,
+    });
+  } catch (error) {
+    console.error("❌ Error updating transfer:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update transfer",
+      error: error.message,
+    });
+  }
+};
+
+
 /** ✅ Get All Transfers (simplified) */
 // export const getAllTransfers = async (req, res) => {
 //   try {

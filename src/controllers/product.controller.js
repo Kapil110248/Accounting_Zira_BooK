@@ -85,7 +85,7 @@ export const createProduct = async (req, res) => {
       discount,
       tax_account,
       remarks,
-      warehouses, // ✅ [{ warehouse_id, stock_qty }]
+      warehouses, // [{ warehouse_id, stock_qty }]
     } = req.body;
 
     // ✅ Upload image if provided
@@ -94,7 +94,7 @@ export const createProduct = async (req, res) => {
       imageUrl = await uploadToCloudinary(req.file.buffer, "products");
     }
 
-    // ✅ Parse warehouses (handle JSON string case)
+    // ✅ Parse warehouses safely
     let parsedWarehouses = [];
     if (typeof warehouses === "string") {
       try {
@@ -113,7 +113,7 @@ export const createProduct = async (req, res) => {
       0
     );
 
-    // ✅ Create Product
+    // ✅ Create product with warehouse relations
     const product = await prisma.products.create({
       data: {
         company_id: Number(company_id),
@@ -135,8 +135,6 @@ export const createProduct = async (req, res) => {
         remarks,
         image: imageUrl,
         total_stock: totalStock,
-
-        // ✅ Create warehouse mappings
         product_warehouses: {
           create: parsedWarehouses.map((w) => ({
             warehouse_id: Number(w.warehouse_id),
@@ -148,7 +146,11 @@ export const createProduct = async (req, res) => {
         product_warehouses: {
           include: {
             warehouse: {
-              select: { id: true, warehouse_name: true, location: true },
+              select: {
+                id: true,
+                warehouse_name: true,
+                location: true,
+              },
             },
           },
         },
@@ -165,21 +167,42 @@ export const createProduct = async (req, res) => {
       },
     });
 
-    // ✅ Transform warehouse data before sending response
+    // ✅ Simplify warehouse structure
     const simplifiedWarehouses = product.product_warehouses.map((pw) => ({
-      id: pw.warehouse.id,
+      warehouse_id: pw.warehouse.id,
       warehouse_name: pw.warehouse.warehouse_name,
       location: pw.warehouse.location,
       stock_qty: pw.stock_qty,
     }));
 
-    // ✅ Final response
+    // ✅ Final unified product response
     return res.status(201).json({
       success: true,
       message: "✅ Product created successfully with warehouse mapping",
       data: {
-        ...product,
-        product_warehouses: simplifiedWarehouses, // ✅ cleaned array
+        id: product.id,
+        company_id: product.company_id,
+        item_category: product.item_category,
+        unit_detail: product.unit_detail,
+        item_name: product.item_name,
+        hsn: product.hsn,
+        barcode: product.barcode,
+        sku: product.sku,
+        description: product.description,
+        initial_qty: product.initial_qty,
+        min_order_qty: product.min_order_qty,
+        as_of_date: product.as_of_date,
+        initial_cost: product.initial_cost,
+        sale_price: product.sale_price,
+        purchase_price: product.purchase_price,
+        discount: product.discount,
+        tax_account: product.tax_account,
+        remarks: product.remarks,
+        total_stock: product.total_stock,
+        image: product.image,
+        warehouses: simplifiedWarehouses,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
       },
     });
   } catch (error) {
@@ -280,11 +303,10 @@ export const getProductsByCompany = async (req, res) => {
       });
     }
 
-    // ✅ Fetch products belonging to the company
+    // ✅ Fetch products with related data
     const products = await prisma.products.findMany({
       where: { company_id: companyId },
       include: {
-        // ✅ Include all linked warehouses via product_warehouses
         product_warehouses: {
           include: {
             warehouse: {
@@ -292,23 +314,16 @@ export const getProductsByCompany = async (req, res) => {
                 id: true,
                 warehouse_name: true,
                 location: true,
-                city: true,
-                state: true,
-                country: true,
               },
             },
           },
         },
-
-        // ✅ Include item category
         item_category: {
           select: {
             id: true,
             item_category_name: true,
           },
         },
-
-        // ✅ Include unit details
         unit_detail: {
           select: {
             id: true,
@@ -322,19 +337,46 @@ export const getProductsByCompany = async (req, res) => {
       orderBy: { created_at: "desc" },
     });
 
-    // ✅ Fallback: dynamically compute total_stock if missing
+    // ✅ Format and flatten warehouses
     const formattedProducts = products.map((product) => {
+      const warehouses = product.product_warehouses.map((pw) => ({
+        warehouse_id: pw.warehouse?.id,
+        warehouse_name: pw.warehouse?.warehouse_name,
+        location: pw.warehouse?.location,
+        stock_qty: pw.stock_qty ?? 0,
+      }));
+
       const totalStock =
         product.total_stock ??
-        product.product_warehouses.reduce(
-          (sum, pw) => sum + (pw.stock_qty || 0),
-          0
-        );
+        warehouses.reduce((sum, w) => sum + (w.stock_qty || 0), 0);
 
-      return { ...product, total_stock: totalStock };
+      return {
+        id: product.id,
+        company_id: product.company_id,
+        item_category: product.item_category,
+        unit_detail: product.unit_detail,
+        item_name: product.item_name,
+        hsn: product.hsn,
+        barcode: product.barcode,
+        sku: product.sku,
+        description: product.description,
+        initial_qty: product.initial_qty,
+        min_order_qty: product.min_order_qty,
+        as_of_date: product.as_of_date,
+        initial_cost: product.initial_cost,
+        sale_price: product.sale_price,
+        purchase_price: product.purchase_price,
+        discount: product.discount,
+        tax_account: product.tax_account,
+        remarks: product.remarks,
+        total_stock: totalStock,
+        image: product.image,
+        warehouses,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
+      };
     });
 
-    // ✅ Handle empty case
     if (formattedProducts.length === 0) {
       return res.status(404).json({
         success: false,
@@ -342,7 +384,7 @@ export const getProductsByCompany = async (req, res) => {
       });
     }
 
-    // ✅ Success response
+    // ✅ Final success response
     return res.status(200).json({
       success: true,
       message: `✅ Products fetched successfully for company_id ${companyId}`,
@@ -357,7 +399,7 @@ export const getProductsByCompany = async (req, res) => {
       error: error.message,
     });
   }
-};
+};;
 
 export const getProductsByCompanyAndWarehouse = async (req, res) => {
   try {
